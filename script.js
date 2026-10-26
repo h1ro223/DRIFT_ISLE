@@ -725,7 +725,7 @@ const IT = {
   stone_pick: { n: '石のつるはし', ic: 'pick_s', st: 1, dur: 90, tool: { cls: 'pick', tier: 1, pow: 2 }, dmg: 4, d: '岩や鉱石を掘れる。' },
   iron_pick: { n: '鉄のつるはし', ic: 'pick_i', st: 1, dur: 260, tool: { cls: 'pick', tier: 2, pow: 5 }, dmg: 7, d: '大岩や水晶も掘れる。' },
   shovel: { n: 'シャベル', ic: 'shovel', st: 1, dur: 120, tool: { cls: 'shovel', tier: 1, pow: 3 }, dmg: 3, d: '粘土やいもを掘る。草地を耕して畑にできる。宝探しにも。' },
-  hammer: { n: 'ハンマー', ic: 'hammer', st: 1, dur: 150, tool: { cls: 'hammer', tier: 1, pow: 99 }, dmg: 4, d: '設置した物を解体して材料に戻す。' },
+  hammer: { n: 'ハンマー', ic: 'hammer', st: 1, dur: 150, tool: { cls: 'hammer', tier: 1, pow: 99 }, dmg: 4, d: '設置した物を一瞬で解体してアイテムに戻す。（素手でもⒶ長押しで回収できる）' },
   fishing_rod: { n: '釣り竿', ic: 'rod', st: 1, dur: 60, rod: true, dmg: 1, d: '水辺で使うと釣りができる。' },
   torch: { n: 'たいまつ', ic: 'torch', st: 10, dur: 150, light: 78, burn: true, dmg: 3, d: '持っている間、周りを照らす。燃え尽きるとなくなる。' },
   lantern: { n: 'ランタン', ic: 'lantern', st: 1, light: 104, dmg: 2, d: '水晶の光で周りを明るく照らす。燃え尽きない。' },
@@ -994,25 +994,29 @@ const ACH = [
 
 // ---------- メイン目標 ----------
 const QUESTS = [
-  { t: '流れ着いた砂浜', d: '浜辺の木箱を開けてみよう。', chk: g => [Math.min(1, g.stats.crates), 1] },
-  { t: '材料集め', d: '落ち枝と小石を拾おう。木を素手で叩いても枝が取れる。', chk: g => [Math.min(3, cnt('stick')) + Math.min(3, cnt('stone')), 6] },
-  { t: '最初の道具', d: 'クラフトで「石の斧」を作ろう。植物繊維は草むらから。', chk: g => [g.flags.made_stone_axe ? 1 : 0, 1] },
-  { t: '火をおこそう', d: '「たき火」を作って設置しよう。', chk: g => [g.flags.placed_campfire ? 1 : 0, 1] },
-  { t: '水の確保', d: '器に水を汲んでたき火で煮沸するか、ココナッツを飲もう。', chk: g => [g.flags.safe_drink ? 1 : 0, 1] },
-  { t: '夜に備えて', d: '「葉っぱの寝床」を作って設置しよう。夜に眠れる。', chk: g => [g.flags.placed_bed ? 1 : 0, 1] },
-  { t: '作業台', d: '「作業台」を設置しよう。作れる物が一気に増える。', chk: g => [g.flags.placed_workbench ? 1 : 0, 1] },
-  { t: '島の探索', d: '島の内陸に誰かの小屋があるらしい。地図の目印を目指そう。', chk: g => [g.pois.hut && g.pois.hut.found ? 1 : 0, 1], target: g => g.pois.hut },
-  { t: 'ケンジの日記', d: '小屋に残された日記を読もう。', chk: g => [g.pages[1] ? 1 : 0, 1], target: g => g.pois.hut },
-  { t: '島からの脱出', d: '3つの脱出ルートのどれかを達成しよう。', chk: g => [0, 1] },
+  { t: '流れ着いた砂浜', d: '浜辺に流れ着いた木箱を調べてみよう。', items: g => [['木箱を開ける', Math.min(1, g.stats.crates), 1]] },
+  { t: '材料集め', d: '石の斧の材料を集めよう。落ち枝・小石は拾うだけ。植物繊維は草むらを刈ると取れる。', items: g => { const d = g.flags.made_stone_axe; return [qm('枝', 'stick', 3, d), qm('石', 'stone', 3, d), qm('植物繊維', 'fiber', 2, d)]; } },
+  { t: '最初の道具', d: 'クラフト画面で「石の斧」を作ろう。', items: g => [['石の斧を作る', g.flags.made_stone_axe ? 1 : 0, 1]] },
+  { t: '火をおこそう', d: '斧で木を切ると枝が取れる。たき火を作って、置きたい場所に向かって使おう。', items: g => { const d = g.flags.placed_campfire, m = d || g.flags.made_campfire; return [qm('枝', 'stick', 3, m), qm('石', 'stone', 4, m), ['たき火を設置する', d ? 1 : 0, 1]]; } },
+  { t: '水の確保', d: 'ヤシの木を素手で揺らすとココナッツが落ちる。または器で池の水を汲み、たき火で煮沸しよう。', any: 1, items: g => [['ココナッツを飲む', g.flags.drank_coconut ? 1 : 0, 1], ['きれいな水を作る', (g.flags.gotclean || g.flags.boiled || g.flags.safe_drink) ? 1 : 0, 1]] },
+  { t: '夜に備えて', d: '大きな葉はシダを刈るか、ヤシの木を切ると取れる。寝床で眠ると朝になり、セーブされる。', items: g => { const d = g.flags.placed_bed, m = d || g.flags.made_leaf_bed; return [qm('大きな葉', 'leaf', 6, m), qm('植物繊維', 'fiber', 2, m), ['寝床を設置する', d ? 1 : 0, 1]]; } },
+  { t: '作業台', d: '木材は斧で木を切り倒すと取れる。作業台のそばでは作れる物が一気に増える。', items: g => { const d = g.flags.placed_workbench, m = d || g.flags.made_workbench; return [qm('木材', 'wood', 6, m), qm('枝', 'stick', 4, m), ['作業台を設置する', d ? 1 : 0, 1]]; } },
+  { t: '島の探索', d: '島の内陸に誰かの小屋があるらしい。地図で点滅している目印を目指そう。', items: g => [['ケンジの小屋を見つける', g.pois.hut && g.pois.hut.found ? 1 : 0, 1]], target: g => g.pois.hut },
+  { t: 'ケンジの日記', d: '小屋の中に残された日記を読もう。', items: g => [['日記を読む', g.pages[1] ? 1 : 0, 1]], target: g => g.pois.hut },
+  { t: '島からの脱出', d: '3つの脱出ルートのどれかを達成しよう。', items: g => [], final: 1 },
 ];
+// 目標の項目 [表示名, 現在, 必要数]。done が真なら達成扱い
+function qm(label, id, need, done) { return [label, done ? need : Math.min(need, cnt(id)), need]; }
+function qProg(q) { const it = q.items(G); return { it, ok: q.any ? it.some(x => x[1] >= x[2]) : (it.length > 0 && it.every(x => x[1] >= x[2])) }; }
 
 const HELP = [
   ['目的', '無人島で生き延び、脱出の方法を見つけよう。脱出ルートは「いかだ」「のろし」「無線」の3つ。島に残された日記が手がかりになる。'],
   ['ステータス', '体力・空腹・水分・スタミナ・体温に気をつけよう。空腹か水分が0になると体力が減っていく。夜や雨は体が冷える。たき火のそばは暖かい。'],
   ['基本操作', 'Ⓐ：調べる／採取／攻撃／使う　Ⓑ：長押しでダッシュ（メニューでは戻る）　Ⓧ：バッグ　Ⓨ：クラフト。ホットバーで手に持つ物を選び、Ⓐで使う。'],
-  ['キーボード', '移動：WASD／矢印　Ⓐ：Space／J／Z　Ⓑ：Shift／K　バッグ：I／Tab　クラフト：C　地図：M　メニュー：Esc　持ち物切替：1〜8、Q／E、ホイール'],
+  ['キーボード', '移動：WASD／矢印　Ⓐ：Space／J／Z　Ⓑ（ダッシュ）：Shift／K　バッグ：Bキー／I／Tab　クラフト：C　地図：M　メニュー：Esc　持ち物切替：1〜8、Q／E、ホイール'],
   ['コントローラー', '移動：左スティック／十字キー　A：アクション　B：ダッシュ／戻る　X：バッグ　Y：クラフト　LB／RB：持ち物切替（メニューではタブ切替）　START：メニュー　SELECT：地図'],
   ['道具と採取', '木は斧、岩はつるはし、粘土はシャベルで。素手でも草むら・落ち枝・小石は拾える。素手で木を叩くと枝、ヤシを揺らすとココナッツが落ちる。'],
+  ['設置物の回収', '自分で置いた物（たき火・柵・収納箱など）は、Ⓐを長押しすると回収してアイテムに戻せる。中に入っていた物はその場に落ちる。ハンマーを持っていれば一瞬で解体できる。'],
   ['水', '器を持って水辺でⒶ。池の水は汚れているので、たき火で煮沸しよう。海水は煮詰めると塩になる。雨水集め器の水はそのまま飲める。'],
   ['料理と設備', 'たき火のそばで「料理」タブのレシピが作れる。作業台・かまどのそばでもそれぞれのレシピが解放される。たき火は燃料（木材や枝）を持ってⒶでくべる。'],
   ['夜と眠り', '夜はオオカミが出て危険。寝床で眠ると朝まで休めて、自動でセーブされる。寝床は倒れたときの復活地点になる。'],
@@ -1285,8 +1289,12 @@ function genIsland(seed) {
     for (let k = 0; k < 6; k++) {
       const p = findBest(1500, (x, y) => okT(m.t[y * W + x]) && !reserved[y * W + x] && reachable(x, y) && dS(x, y) > 14 && info.treasures.every(t => Math.hypot(t.x - x, t.y - y) > 18), () => R());
       if (!p) continue;
-      info.treasures.push({ x: p.x, y: p.y, found: 0, known: 0, tab: k === 0 ? 1 : 0 });
+      info.treasures.push({ x: p.x, y: p.y, found: 0, known: 0, tab: info.treasures.length === 0 ? 1 : 0 });
       reserve(p.x, p.y, 1, 1);
+    }
+    if (!info.treasures.length) { // 星の石版の宝は必ず用意する
+      const p = freeNear(m, spawn.x, spawn.y - 10, (x, y) => landT(tAt(m, x, y)) && !reserved[y * W + x] && reachable(x, y), 60) || spawn;
+      info.treasures.push({ x: p.x, y: p.y, found: 0, known: 0, tab: 1 }); reserve(p.x, p.y, 1, 1);
     }
   }
   // --- 難破船と木箱 ---
@@ -1317,6 +1325,17 @@ function genIsland(seed) {
     }
     if (!k && (t === T.GRASS || t === T.FOREST) && r > .9) { let nearW = false; for (let d = 0; d < 4; d++) if (tAt(m, x + DIRV[d].x, y + DIRV[d].y) === T.FRESH) nearW = true; if (nearW) k = 'clay_o'; }
     if (k) { const o = mkO(k); if (k === 'palm') o.c = Math.floor(R() * 3); setO(m, x, y, o); }
+  }
+  // --- ねんどを最低限保証（沼地がない島でも詰まないように） ---
+  {
+    let clay = 0; for (const o of m.o) if (o && o.k === 'clay_o') clay++;
+    const nearW = (x, y, t2) => DIRV.some(d => t2.includes(tAt(m, x + d.x, y + d.y)));
+    for (let k = 0; k < 8000 && clay < 12; k++) {
+      const x = rr(2, W - 3), y = rr(2, H - 3), i = y * W + x, t = m.t[i];
+      if (reserved[i] || m.o[i] || reach.dist[i] < 0) continue;
+      const green = t === T.GRASS || t === T.FOREST || t === T.JUNGLE;
+      if (t === T.SWAMP || (green && nearW(x, y, [T.FRESH])) || (k > 4000 && green && nearW(x, y, [T.FRESH, T.SHALLOW])) || (k > 6500 && green)) { setO(m, x, y, mkO('clay_o')); clay++; }
+    }
   }
   // --- 主要地点への道を確保 ---
   {
@@ -1419,7 +1438,7 @@ const TOOLN = { axe: '斧', pick: 'つるはし', shovel: 'シャベル' };
 const LIGHT_K = { campfire: 1, signal: 1, torch_post: 1, crystal_rock: 1, note: 1, old_pack: 1, bag: 1, heli: 1 };
 const FLAT_K = { flower: 1, sos: 1, crop: 1, twig: 1, pebble: 1, shell_o: 1, note: 1, bottle: 1, clay_o: 1, cave_out: 1, bed: 1, old_raft: 1, stump: 1, bag: 1, old_pack: 1 };
 
-const OPT = Object.assign({ bgm: 6, se: 7, swapAB: false, swapXY: false, touch: 1, dark: 0, minimap: true, dmgNum: true, shake: true },
+const OPT = Object.assign({ bgm: 6, se: 7, swapAB: false, swapXY: false, touch: 1, dark: 0, flicker: true, minimap: true, dmgNum: true, shake: true },
   (() => { try { return JSON.parse(localStorage.getItem(OPT_KEY)) || {}; } catch (e) { return {}; } })());
 function saveOpt() { try { localStorage.setItem(OPT_KEY, JSON.stringify(OPT)); } catch (e) { } }
 let ACHV = (() => { try { return JSON.parse(localStorage.getItem(ACH_KEY)) || {}; } catch (e) { return {}; } })();
@@ -1436,7 +1455,7 @@ const isNight = () => { const h = hour(); return h >= 19.5 || h < 5; };
 
 function newPlayer(sp) {
   return { x: sp.x * TS + 8, y: sp.y * TS + 12, dir: 2, ax: 0, ay: 1, hp: 100, mhp: 100, food: 85, water: 80, sta: 100, temp: 70, poison: 0, sick: 0, fed: 0,
-    inv: 0, swing: 0, swDur: .3, swHit: false, swType: null, swTgt: null, anim: 0, moving: false, running: false, staDelay: 0, kbx: 0, kby: 0, fishing: null, dead: false, cd: 0, rep: false, hurtFlash: 0 };
+    inv: 0, swing: 0, swDur: .3, swHit: false, swType: null, swTgt: null, anim: 0, moving: false, running: false, staDelay: 0, kbx: 0, kby: 0, fishing: null, dead: false, cd: 0, rep: false, hurtFlash: 0, pick: null, pickT: 0, pickA: null };
 }
 function newGame(seed, diff, slot) {
   const isl = genIsland(seed), cave = genCave(seed);
@@ -1512,7 +1531,7 @@ function doCraft(rc, times) {
     for (const k in rc.r) { invRemove(k, rc.r[k]); if (IT[k].ret && !rc.noRet) invAdd(IT[k].ret, rc.r[k]); }
     give(rc.o, rc.n, true); made++;
     G.stats.craft++; G.flags['made_' + rc.o] = 1;
-    if (rc.s === 'fire') { G.stats.cook++; if (G.stats.cook >= 30) unlock('cook'); if (rc.o === 'clean_water') G.flags.boiled = 1; }
+    if (rc.s === 'fire') { G.stats.cook++; if (G.stats.cook >= 30) unlock('cook'); if (rc.o === 'clean_water') { G.flags.boiled = 1; G.flags.gotclean = 1; } }
   }
   if (!made) { sfx('no'); return 0; }
   pickupToast(rc.o, rc.n * made);
@@ -1553,10 +1572,13 @@ function actionInfo() {
     if (def.tool.cls === 'hammer' && od.pl) return { lbl: '解体：' + od.n, f: () => startSwing('obj', tg), rep: 1, tgt: 1 };
     if (od.tool === def.tool.cls) return { lbl: TOOLV[od.tool] + '：' + od.n, f: () => startSwing('obj', tg), rep: 1, tgt: 1 };
   }
+  // 自分で置いた物は、ハンマー以外でもⒶ長押しで回収できる（閉じ込め防止）
+  const pk = (o && od.pl && !(def && def.tool && def.tool.cls === 'hammer')) ? tg : null, sub = pk ? '長押しで回収' : null;
   if (o && od.use) {
-    if ((o.k === 'campfire' || o.k === 'signal') && def && def.fuel) return { lbl: '燃料をくべる：' + def.n, f: () => addFuel(o), tgt: 1 };
-    return { lbl: (od.lbl || '調べる') + '：' + od.n, f: () => useObj(tg), tgt: 1 };
+    if ((o.k === 'campfire' || o.k === 'signal') && def && def.fuel) return { lbl: '燃料をくべる：' + def.n, f: () => addFuel(o), tgt: 1, pick: pk, sub };
+    return { lbl: (od.lbl || '調べる') + '：' + od.n, f: () => useObj(tg), tgt: 1, pick: pk, sub };
   }
+  if (pk) return { lbl: '回収：' + od.n, f: () => toast('Ⓐを長押しすると回収できる', '', 'pickhint'), tgt: 1, pick: pk, sub: '長押し' };
   if (def) {
     if (def.place) { const why = canPlace(s.id, tg.x, tg.y); return { lbl: why || ('設置：' + def.n), f: () => { if (why) { toast(why, 'warn', 'place'); sfx('no'); } else placeIt(tg.x, tg.y); }, bad: !!why, place: 1 }; }
     if (def.plant && tAt(G.map, tg.x, tg.y) === T.FARM && !o) return { lbl: '植える：' + def.n, f: () => plantIt(tg) };
@@ -1708,6 +1730,7 @@ function consume(i) {
   if (e.w < 0) toast('しょっぱい！喉がもっと渇いた…', 'bad');
   sfx((e.w || 0) > (e.h || 0) ? 'drink' : (e.hp && !e.h) ? 'heal' : 'eat');
   if (s.id === 'clean_water' || s.id === 'coconut') G.flags.safe_drink = 1;
+  if (s.id === 'coconut') G.flags.drank_coconut = 1;
   if (s.id === 'stew' || s.id === 'fish_soup') unlock('stew');
   floatTxt(p.x, p.y - 22, '+', e.hp && !e.h ? '#7cff9a' : '#ffe08a');
   take1(i); if (def.ret) give(def.ret, 1, true);
@@ -1802,7 +1825,7 @@ function useObj(tg) {
     case 'collector': {
       if (!(o.w > 0)) { toast('まだ水がたまっていない（雨が降るとたまる）', '', 'col'); break; }
       const b = cnt('bowl'); if (!b) { toast('器が必要だ', 'warn', 'bowl'); break; }
-      const k = Math.min(b, o.w); invRemove('bowl', k); give('clean_water', k); o.w -= k; sfx('splash'); break;
+      const k = Math.min(b, o.w); invRemove('bowl', k); give('clean_water', k); o.w -= k; G.flags.gotclean = 1; sfx('splash'); break;
     }
     case 'crop': {
       if (o.g >= 1) { const c = CROPS[o.c]; for (const [id, a, b] of c.out) give(id, randi(a, b)); delO(m, tg.x, tg.y); sfx('pick'); leafParts(cx, cy - 4); G.stats.harvest++; if (G.stats.harvest >= 10) unlock('farmer'); }
@@ -1987,7 +2010,7 @@ function objTick(m, h) {
       case 'bush': case 'banana_tree': if (!o.r) { o.t = (o.t == null ? 30 : o.t) - rainK; if (o.t <= 0) { o.r = 1; o.t = null; } } break;
       case 'palm': if ((o.c || 0) < 2 && Math.random() < .03) o.c = (o.c || 0) + 1; break;
       case 'stump': if (o.was) { o.t = (o.t == null ? 30 : o.t) - 1; if (o.t <= 0) setO(m, o.x, o.y, { k: 'sapling', was: o.was, t: 36 }); } break;
-      case 'sapling': o.t -= rainK; if (o.t <= 0 && !(here && Math.abs(o.x - ptx) <= 1 && Math.abs(o.y - pty) <= 1)) { const n = mkO(o.was || 'tree'); if (o.was === 'palm') n.c = 0; setO(m, o.x, o.y, n); } break;
+      case 'sapling': o.t -= rainK; if (o.t <= 0 && !(here && Math.abs(o.x - ptx) <= 1 && Math.abs(o.y - pty) <= 1) && safeBlock(m, o.x, o.y)) { const n = mkO(o.was || 'tree'); if (o.was === 'palm') n.c = 0; setO(m, o.x, o.y, n); } break;
       case 'crop': o.g = Math.min(1, o.g + rainK / (CROPS[o.c].days * 24)); break;
       case 'collector': if (m.id === 'island') { if (G.rain > .3) o.w = Math.min(4, (o.w || 0) + (G.weather === 'storm' ? 2 : 1)); else if (h === 6) o.w = Math.min(4, (o.w || 0) + 1); } break;
     }
@@ -2002,13 +2025,32 @@ function objTick(m, h) {
     for (const [kk, pr] of list) {
       if (r < pr) {
         if ((counts[kk] || 0) < (CAPS[kk] || 50)) {
-          if (OB[kk].solid && m.id === 'cave') { let w = false; for (const d of DIRV) if (tAt(m, x + d.x, y + d.y) === T.CWALL) w = true; if (!w) break; }
+          if (OB[kk].solid) { if (m.id === 'cave') { let w = false; for (const d of DIRV) if (tAt(m, x + d.x, y + d.y) === T.CWALL) w = true; if (!w) break; } if (!safeBlock(m, x, y)) break; }
           setO(m, x, y, mkO(kk)); counts[kk] = (counts[kk] || 0) + 1;
         }
         break;
       }
       r -= pr;
     }
+  }
+  clayTick(m, counts, here, ptx, pty);
+}
+// そのマスをふさいでも周囲の通路がつながったままか（局所的な連結チェック）
+function safeBlock(m, x, y) {
+  const ring = [[-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]];
+  const free = ring.map(([dx, dy]) => { const t = tAt(m, x + dx, y + dy), o = oAt(m, x + dx, y + dy); return walkT(t) && !(o && OB[o.k].solid && !OB[o.k].mobOnly); });
+  const f = i => free[(i + 8) % 8];
+  const orth = [1, 3, 5, 7].filter(i => f(i)); if (orth.length <= 1) return true;
+  let comps = orth.length; for (const i of [1, 3, 5, 7]) if (f(i) && f(i + 2) && f(i + 1)) comps--;
+  return comps <= 1;
+}
+function clayTick(m, counts, here, ptx, pty) {
+  if (m.id !== 'island' || (counts.clay_o || 0) >= 12) return;
+  for (let k = 0; k < 60; k++) {
+    const x = randi(2, m.w - 3), y = randi(2, m.h - 3), i = y * m.w + x, t = m.t[i];
+    if (m.o[i] || (here && Math.hypot(x - ptx, y - pty) < 12)) continue;
+    const green = t === T.GRASS || t === T.FOREST || t === T.JUNGLE;
+    if (t === T.SWAMP || (green && DIRV.some(d => { const n = tAt(m, x + d.x, y + d.y); return n === T.FRESH || (k > 30 && n === T.SHALLOW); }))) { setO(m, x, y, mkO('clay_o')); counts.clay_o = (counts.clay_o || 0) + 1; return; }
   }
 }
 function startShip() {
@@ -2049,16 +2091,15 @@ function poiTick() {
 }
 function questTick() {
   if (G.quest >= QUESTS.length - 1) return;
-  const q = QUESTS[G.quest], [c, mx] = q.chk(G);
-  if (c >= mx) { G.quest++; toast('目標達成：' + q.t, 'quest'); sfx('quest'); RT.questDirty = true; }
+  const q = QUESTS[G.quest];
+  if (qProg(q).ok) { G.quest++; toast('目標達成：' + q.t, 'quest'); sfx('quest'); RT.questDirty = true; }
 }
 function routes() {
-  const r = findObj('raft'), radio = (() => { const m = G.maps.island; for (const o of m.o) if (o && o.k === 'radio') return o; return null; })();
-  const fixed = radio && radio.fixed;
+  const r = findObj('raft'), radio = findObj('radio'), fixed = !!(radio && radio.fixed), b = x => x ? 1 : 0;
   return [
-    { n: 'いかだで脱出', items: [['浅瀬に「いかだの土台」を設置', !!r], ['帆を取り付ける', !!(r && r.sail)], ['オールを2本取り付ける', !!(r && r.oar >= 2)], ['方位磁針を取り付ける', !!(r && r.compass)], ['干し肉×5を持つ', cnt('jerky') >= 5], ['きれいな水×5を持つ', cnt('clean_water') >= 5]] },
-    { n: 'のろしで救助', items: [['山頂に「のろし台」を設置', !!findObj('signal')], ['砂浜に「SOSサイン」を設置', !!findObj('sos')], ['船が見えたら、のろしに火をつける', false]] },
-    { n: '無線で救助', items: [['真空管（洞窟の最深部）', fixed || cnt('tube') > 0], ['アンテナ（遺跡の奥）', fixed || cnt('antenna') > 0], ['バッテリー（北の入り江）', fixed || cnt('battery') > 0], ['金属くず×4', fixed || cnt('scrap') >= 4], ['小屋の無線機を修理する', !!fixed], ['無線で救助を呼ぶ', !!G.rescue]] },
+    { n: 'いかだで脱出', items: [['浅瀬に「いかだの土台」を設置', b(r), 1], ['帆を取り付ける', b(r && r.sail), 1], ['オールを取り付ける', r ? Math.min(2, r.oar || 0) : 0, 2], ['方位磁針を取り付ける', b(r && r.compass), 1], ['干し肉', Math.min(5, cnt('jerky')), 5], ['きれいな水', Math.min(5, cnt('clean_water')), 5]] },
+    { n: 'のろしで救助', items: [['山頂に「のろし台」を設置', b(findObj('signal')), 1], ['砂浜に「SOSサイン」を設置', b(findObj('sos')), 1], ['船が見えたら、のろしに火をつける', 0, 1]] },
+    { n: '無線で救助', items: [['真空管（洞窟の最深部）', b(fixed || cnt('tube')), 1], ['アンテナ（遺跡の奥）', b(fixed || cnt('antenna')), 1], ['バッテリー（北の入り江）', b(fixed || cnt('battery')), 1], ['金属くず', fixed ? 4 : Math.min(4, cnt('scrap')), 4], ['小屋の無線機を修理する', b(fixed), 1], ['無線で救助を呼ぶ', b(G.rescue), 1]] },
   ];
 }
 
@@ -2167,8 +2208,20 @@ function updPlayer(dt) {
     p.swing += dt;
     if (!p.swHit && p.swing >= p.swDur * .45) { p.swHit = true; resolveSwing(); }
     if (p.swing >= p.swDur) { p.swing = 0; p.cd = .06; }
-  } else if (Inp.pr('A')) doAction();
-  else if (Inp.dn('A') && p.rep && p.cd <= 0) { const a = actionInfo(); if (a && a.rep) a.f(); }
+  } else if (p.pick) {
+    // 設置物：短く押す＝使う／長押し＝回収
+    const pk = p.pick, tg = getTarget();
+    if (tg.o !== pk.o || oAt(m, pk.x, pk.y) !== pk.o) { p.pick = null; }
+    else if (Inp.dn('A')) {
+      p.pickT += dt;
+      if (p.pickT >= .9) { p.pick = null; p.cd = .35; p.rep = false; dismantle(pk.x, pk.y, pk.o); toast(OB[pk.o.k].n + 'を回収した', 'good'); RT.find = {}; }
+    } else { const a = p.pickA, tap = p.pickT < .3; p.pick = null; if (tap && a) { p.rep = !!a.rep; a.f(); } }
+  } else if (Inp.pr('A')) {
+    const a = actionInfo();
+    if (a && a.pick && p.cd <= 0) { p.pick = a.pick; p.pickT = 0; p.pickA = a; }
+    else doAction();
+  }
+  else if (Inp.dn('A') && p.rep && p.cd <= 0) { const a = actionInfo(); if (a && a.rep && !a.pick) a.f(); }
 }
 
 // ---------- ダメージ ----------
@@ -2202,7 +2255,7 @@ function killMob(e) {
 }
 function die() {
   const p = G.p; if (p.dead) return;
-  p.dead = true; p.hp = 0; p.fishing = null; p.swing = 0; G.stats.deaths++; sfx('die'); G.mode = 'dead'; RT.deadT = 0; RT.deadShown = 0;
+  p.dead = true; p.hp = 0; p.fishing = null; p.swing = 0; p.pick = null; G.stats.deaths++; sfx('die'); G.mode = 'dead'; RT.deadT = 0; RT.deadShown = 0;
   RT.lostItems = false;
   if (!DIFF[G.diff].keep) {
     const items = []; for (let i = 0; i < G.invSize; i++) { const s = G.inv[i]; if (s && !IT[s.id].key) { items.push(s); G.inv[i] = null; } }
@@ -2534,8 +2587,7 @@ function update(dt) {
 }
 function updCam(dt) {
   const p = G.p, m = G.map, mw = m.w * TS, mh = m.h * TS;
-  let tx = p.x - RT.vw / 2, ty = p.y - 8 - RT.vh / 2;
-  RT.cam.x += (tx - RT.cam.x) * Math.min(1, dt * 8); RT.cam.y += (ty - RT.cam.y) * Math.min(1, dt * 8);
+  RT.cam.x = p.x - Math.floor(RT.vw / 2); RT.cam.y = p.y - 8 - Math.floor(RT.vh / 2);
   RT.cam.x = mw > RT.vw ? clamp(RT.cam.x, 0, mw - RT.vw) : (mw - RT.vw) / 2; RT.cam.y = mh > RT.vh ? clamp(RT.cam.y, 0, mh - RT.vh) : (mh - RT.vh) / 2;
 }
 function snapCam() { RT.cam.x = G.p.x - RT.vw / 2; RT.cam.y = G.p.y - 8 - RT.vh / 2; updCam(0); }
@@ -2928,12 +2980,12 @@ function drawWeather(ctx, r, storm) {
 function darknessAt(h) { if (h >= 6.5 && h < 17) return 0; if (h >= 17 && h < 20) return (h - 17) / 3 * .86; if (h >= 20 || h < 4.5) return .86; return (6.5 - h) / 2 * .86; }
 function collectLights(m) {
   const L = [];
-  if (G && G.map === m && RT.screen === 'game' && !G.p.dead) { const p = G.p, s = held(), d = s && IT[s.id]; L.push({ x: p.x, y: p.y - 8, r: d && d.light ? d.light : 28, fl: d && d.burn, warm: d && d.burn }); }
+  if (G && G.map === m && RT.screen === 'game' && !G.p.dead) { const p = G.p, s = held(), d = s && IT[s.id]; L.push({ x: p.x, y: p.y - 8, r: d && d.light ? d.light : 28, fl: d && d.burn, warm: d && d.burn, sd: 0 }); }
   for (const o of getLit(m)) {
-    const x = o.x * TS + 8, y = o.y * TS + 8;
-    if (o.k === 'campfire') { if (o.fuel > 0) L.push({ x, y, r: 86, fl: 1, warm: 1 }); }
-    else if (o.k === 'signal') { if (o.fuel > 0) L.push({ x, y: y - 6, r: 132, fl: 1, warm: 1 }); }
-    else if (o.k === 'torch_post') L.push({ x, y: y - 8, r: 72, fl: 1, warm: 1 });
+    const x = o.x * TS + 8, y = o.y * TS + 8, sd = o.x * 3.1 + o.y * 1.7;
+    if (o.k === 'campfire') { if (o.fuel > 0) L.push({ x, y, r: 86, fl: 1, warm: 1, sd }); }
+    else if (o.k === 'signal') { if (o.fuel > 0) L.push({ x, y: y - 6, r: 132, fl: 1, warm: 1, sd }); }
+    else if (o.k === 'torch_post') L.push({ x, y: y - 8, r: 72, fl: 1, warm: 1, sd });
     else if (o.k === 'crystal_rock') L.push({ x, y, r: 30 });
     else if (o.k === 'heli') L.push({ x, y, r: 70 });
     else L.push({ x, y, r: 16 });
@@ -2955,7 +3007,8 @@ function drawLighting(ctx, m, cx, cy, h, rain) {
   const lights = collectLights(m);
   for (const L of lights) {
     const x = L.x - cx, y = L.y - cy; if (x < -L.r || y < -L.r || x > RT.vw + L.r || y > RT.vh + L.r) continue;
-    const r = L.r * (L.fl ? 1 + Math.sin(RT.clock * 13 + L.x) * .04 : 1);
+    // ゆらぎは時間だけで決める（位置に依存させない）。設定でOFFにできる
+    const r = L.r * (L.fl && OPT.flicker ? 1 + Math.sin(RT.clock * 4.2 + (L.sd || 0)) * .018 + Math.sin(RT.clock * 6.9 + (L.sd || 0) * 1.7) * .01 : 1);
     for (const [k, a] of [[1, .3], [.75, .35], [.5, .35], [.3, .45]]) { lx.globalAlpha = a; lx.beginPath(); lx.arc(Math.round(x), Math.round(y), Math.round(r * k), 0, Math.PI * 2); lx.fill(); }
   }
   lx.globalAlpha = 1; lx.globalCompositeOperation = 'source-over';
@@ -2974,6 +3027,7 @@ function drawOverlays(ctx, cx, cy) {
       brackets(ctx, sx, sy, RT.act.bad ? '#ff3355' : '#7cff9a');
     } else if (RT.act.tgt && tg.o) brackets(ctx, sx, sy, RT.act.bad ? '#ff7a7a' : '#ffffff');
   }
+  if (p.pick && p.pickT > .1) { const sx = p.pick.x * TS - cx, sy = p.pick.y * TS - cy - 7; R(ctx, sx - 1, sy - 1, 18, 4, '#160f1c'); R(ctx, sx, sy, Math.max(1, Math.round(16 * Math.min(1, p.pickT / .9))), 2, '#7cff9a'); }
   for (const f of RT.floats) drawNum(ctx, f.txt, Math.round(f.x - cx), Math.round(f.y - cy - f.t * 18), f.col, '#160f1c');
   const f = p.fishing;
   if (f && f.ph === 'reel') {
@@ -3103,7 +3157,7 @@ function slotHTML(s, attrs, cls) {
 }
 function fmtTime(s) { s = Math.floor(s || 0); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h}時間${m}分` : `${m}分`; }
 function slotDesc(inf) { return `${inf.day}日目・${DIFF[inf.diff] ? DIFF[inf.diff].n : ''}・${fmtTime(inf.play)}・日記${inf.pages}/10${Object.keys(inf.endings || {}).length ? '・★' + Object.keys(inf.endings).sort().join('') : ''}`; }
-const glyph = b => Inp.mode === 'kb' ? ({ A: 'Space', B: 'Shift', X: 'I', Y: 'C', START: 'Esc', SELECT: 'M', LB: 'Q', RB: 'E' }[b] || b) : b;
+const glyph = b => Inp.mode === 'kb' ? ({ A: 'Space', B: 'Shift', X: 'B', Y: 'C', START: 'Esc', SELECT: 'M', LB: 'Q', RB: 'E' }[b] || b) : b;
 const gk = b => `<span class="key k${b}">${glyph(b)}</span>`;
 
 function uiInit() {
@@ -3111,9 +3165,15 @@ function uiInit() {
   const hb = $id('hotbar'); hb.innerHTML = '';
   for (let i = 0; i < 8; i++) {
     const d = el('div', 'hs'); d.dataset.i = i; d.innerHTML = `<img alt=""><b></b><i></i><u>${i + 1}</u>`;
-    d.addEventListener('click', () => { if (G && G.mode === 'play' && !UI.open) { G.sel = i; invChanged(); sfx('tick'); } }); hb.appendChild(d);
+    d.dataset.tip = 'inv:' + i;
+    d.addEventListener('click', () => { if (G && G.mode === 'play' && !UI.open) { G.sel = i; invChanged(); sfx('tick'); if (Inp.mode === 'touch') tipTouch(d); } }); hb.appendChild(d);
   }
-  $id('modal').addEventListener('click', e => { const t = e.target.closest('[data-act]'); if (!t) { if (e.target.id === 'modal') UI.close(); return; } UI.act(t.dataset.act, t.dataset, t); });
+  tipEl = el('div'); tipEl.id = 'tip'; $id('app').appendChild(tipEl);
+  $id('modal').addEventListener('click', e => {
+    const t = e.target.closest('[data-act]');
+    if (!t) { if (e.target.id === 'modal') UI.close(); else { const tt = e.target.closest('[data-tip]'); if (tt && Inp.mode === 'touch') tipTouch(tt); } return; }
+    UI.act(t.dataset.act, t.dataset, t);
+  });
   $id('dialog').addEventListener('click', e => { const t = e.target.closest('[data-act]'); if (t) UI.act(t.dataset.act, t.dataset, t); else UI.dlgA(); });
   for (const id of ['title', 'death', 'ending']) $id(id).addEventListener('click', e => { const t = e.target.closest('[data-act]'); if (t) UI.act(t.dataset.act, t.dataset, t); else if (id === 'ending' && UI.endBusy) UI.endSkip(); });
   $id('quest').addEventListener('click', () => UI.openMain('goal'));
@@ -3127,6 +3187,36 @@ function applyOpt() {
   document.body.classList.remove('ts0', 'ts1', 'ts2'); document.body.classList.add('ts' + (OPT.touch | 0));
   const mm = $id('mini'); if (mm) mm.style.display = OPT.minimap ? '' : 'none';
 }
+
+// ---------- ツールチップ（アイテム情報） ----------
+let tipEl = null, tipT = 0, tipSrc = null;
+function tipItem(spec) {
+  if (!G || !spec) return null; const i = spec.indexOf(':'), k = i < 0 ? spec : spec.slice(0, i), v = i < 0 ? '' : spec.slice(i + 1);
+  if (k === 'inv') { const s = G.inv[+v]; return s && IT[s.id] ? { s } : null; }
+  if (k === 'armor') return G.armor ? { s: G.armor } : null;
+  if (k === 'ch') { const s = UI.chest && UI.chest.items && UI.chest.items[+v]; return s && IT[s.id] ? { s } : null; }
+  if (k === 'it') return IT[v] ? { s: { id: v, n: 1 }, own: cnt(v) } : null;
+  return null;
+}
+function tipShow(spec, x, y, anchor) {
+  if (!tipEl) return; const d = tipItem(spec); if (!d) { tipHide(); return; }
+  const s = d.s, def = IT[s.id], st = itemStats(s);
+  if (tipSrc !== spec + '|' + s.n + '|' + (s.d | 0)) {
+    tipEl.innerHTML = `<div class="tt-h"><img src="${ICONURL[def.ic] || ''}" alt=""><b>${esc(def.n)}${s.n > 1 ? ' ×' + s.n : ''}</b>${def.key ? '<span class="tag">大切なもの</span>' : ''}</div>${def.d ? `<p>${esc(def.d)}</p>` : ''}${st.length ? `<ul>${st.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}${d.own != null ? `<p class="own">所持 ${d.own}</p>` : ''}`;
+    tipSrc = spec + '|' + s.n + '|' + (s.d | 0);
+  }
+  tipEl.classList.add('show');
+  const W = window.innerWidth, H = window.innerHeight, r = tipEl.getBoundingClientRect(); let lx, ly;
+  if (anchor) {
+    lx = anchor.right + 8; ly = anchor.top;
+    if (lx + r.width > W - 6) lx = anchor.left - r.width - 8;
+    if (lx < 6) { lx = anchor.left + anchor.width / 2 - r.width / 2; ly = anchor.top - r.height - 8; if (ly < 6) ly = anchor.bottom + 8; }
+  } else { lx = x + 16; ly = y + 16; if (lx + r.width > W - 6) lx = x - r.width - 12; if (ly + r.height > H - 6) ly = y - r.height - 12; }
+  tipEl.style.left = Math.round(clamp(lx, 6, Math.max(6, W - r.width - 6))) + 'px';
+  tipEl.style.top = Math.round(clamp(ly, 6, Math.max(6, H - r.height - 6))) + 'px';
+}
+function tipHide() { if (tipEl) tipEl.classList.remove('show'); tipSrc = null; tipT = 0; }
+function tipTouch(t) { tipShow(t.dataset.tip, 0, 0, t.getBoundingClientRect()); tipT = 2.2; }
 
 // ---------- toasts / notice ----------
 function addToast(e, ms) { const box = $id('toasts'); box.appendChild(e); while (box.children.length > 6) box.firstChild.remove(); e._h = setTimeout(() => fadeOut(e), ms); }
@@ -3173,7 +3263,8 @@ function hudUpdate(dt) {
   const f = p.fishing;
   if (G.mode === 'play' && !p.dead) {
     if (f) hint = f.ph === 'reel' ? gk('A') + '緑の範囲で押す！' : f.ph === 'bite' ? gk('A') + '今だ！引け！' : '浮きが沈むのを待とう　' + gk('B') + 'やめる';
-    else if (RT.act && !(RT.act.weak && !(RT.tg && RT.tg.o))) hint = gk('A') + `<span class="${RT.act.bad ? 'bad' : ''}">${esc(RT.act.lbl)}</span>`;
+    else if (p.pick && p.pickT > .1) hint = gk('A') + '回収中…（そのまま押し続ける）';
+    else if (RT.act && !(RT.act.weak && !(RT.tg && RT.tg.o))) hint = gk('A') + `<span class="${RT.act.bad ? 'bad' : ''}">${esc(RT.act.lbl)}</span>` + (RT.act.sub ? `<small class="hsub">${esc(RT.act.sub)}</small>` : '');
   }
   setHTML('hint', hint); $id('hint').style.visibility = hint ? 'visible' : 'hidden';
   if (RT.invDirty) { RT.invDirty = false; hotbarUpdate(); }
@@ -3191,12 +3282,26 @@ function hotbarUpdate() {
     d.classList.toggle('on', i === G.sel);
   });
   const s = held(), nm = s ? IT[s.id].n : '素手';
-  if (UI.last.held !== nm + G.sel) { if (UI.last.held != null) { $id('held-name').textContent = nm; $id('held-name').classList.add('show'); UI.heldT = 1.4; } UI.last.held = nm + G.sel; }
+  if (UI.last.held !== nm + G.sel) {
+    if (UI.last.held != null) { const st = s ? itemStats(s).slice(0, 3).join('・') : ''; $id('held-name').innerHTML = `<b>${esc(nm)}</b>${st ? `<small>${esc(st)}</small>` : ''}`; $id('held-name').classList.add('show'); UI.heldT = 1.8; }
+    UI.last.held = nm + G.sel;
+  }
+}
+function qLine(label, c, mx) {
+  const ok = c >= mx;
+  return `<li class="${ok ? 'ok' : ''}"><span>${esc(label)}</span><em>${mx > 1 ? c + '/' + mx : ''}${ok ? ' ✅' : ''}</em></li>`;
 }
 function questUpdate() {
   let h;
-  if (G.quest < QUESTS.length - 1) { const q = QUESTS[G.quest], [c, mx] = q.chk(G); h = `<b>${esc(q.t)}</b><small>${esc(q.d)}</small>${mx > 1 ? `<em>${c}/${mx}</em>` : ''}`; }
-  else { const r = routes(); h = '<b>島からの脱出</b><small>' + r.map(x => `${x.n.replace(/で.*$/, '')} ${x.items.filter(i => i[1]).length}/${x.items.length}`).join('　') + '</small>'; }
+  if (G.quest < QUESTS.length - 1) {
+    const q = QUESTS[G.quest], { it } = qProg(q);
+    h = `<b>${esc(q.t)}${q.any ? '<span class="qany">どちらか1つ</span>' : ''}</b><ul>${it.map(([l, c, m]) => qLine(l, c, m)).join('')}</ul><small class="qd">${esc(q.d)}</small>`;
+  } else {
+    const rs = routes(); let best = rs[0], bv = -1;
+    for (const r of rs) { const v = r.items.filter(x => x[1] >= x[2]).length / r.items.length; if (v > bv) { bv = v; best = r; } }
+    const next = best.items.filter(x => x[1] < x[2]).slice(0, 3);
+    h = `<b>脱出：${esc(best.n)}</b><ul>${next.map(([l, c, m]) => qLine(l, c, m)).join('')}</ul><small class="qd">${rs.map(x => x.n.replace(/で.*$/, '') + ' ' + x.items.filter(i => i[1] >= i[2]).length + '/' + x.items.length).join('　')}</small>`;
+  }
   setHTML('quest', h);
 }
 UI.bossBar = e => { const b = $id('bossbar'); if (!e) { b.classList.add('hidden'); return; } $id('boss-name').textContent = e.def.n; b.classList.remove('hidden'); };
@@ -3206,16 +3311,18 @@ UI.openMain = (tab, opt) => {
   if (!G || RT.screen !== 'game' || G.mode !== 'play') return;
   const was = UI.open; UI.open = 'main'; UI.tab = tab || 'bag'; if (opt && opt.cat) UI.craftCat = opt.cat;
   if (tab === 'bag' && UI.invSel !== 'armor' && (UI.invSel == null)) UI.invSel = G.sel;
-  UI.moveFrom = null; UI.focusKey = null; $id('modal').classList.remove('hidden'); renderModal(); if (!was) sfx('open');
+  UI.moveFrom = null; UI.focusKey = UI.tab === 'bag' ? 's-' + G.sel : null; if (UI.tab === 'bag' && !was) UI.invSel = G.sel;
+  $id('modal').classList.remove('hidden'); renderModal(); if (!was) sfx('open');
 };
 UI.openPanel = (kind, o) => { UI.open = kind; UI.panelObj = o; UI.focusKey = null; $id('modal').classList.remove('hidden'); renderModal(); sfx('open'); };
 UI.openChest = (o, isBag) => { UI.chest = o; UI.chestBag = !!isBag; if (!o.items) o.items = []; if (!isBag) while (o.items.length < 20) o.items.push(null); UI.openPanel('chest', o); };
 UI.openRaft = o => UI.openPanel('raft', o);
 UI.openRadio = o => UI.openPanel('radio', o);
 UI.openAltar = o => UI.openPanel('altar', o);
-UI.close = () => { if (!UI.open) return; UI.open = null; UI.moveFrom = null; $id('modal').classList.add('hidden'); sfx('close'); RT.invDirty = true; };
+UI.close = () => { tipHide(); if (!UI.open) return; UI.open = null; UI.moveFrom = null; $id('modal').classList.add('hidden'); sfx('close'); RT.invDirty = true; };
 const PANEL_TITLE = { chest: '収納', raft: 'いかだ', radio: '古い無線機', altar: '石の祭壇', help: '遊び方', opts: '設定', ach: '実績', credit: 'クレジット' };
 function renderModal() {
+  tipHide();
   const tabs = $id('m-tabs'), body = $id('m-body'), st = body.scrollTop;
   if (UI.open === 'main') {
     tabs.innerHTML = MTABS.map(([k, n]) => `<button class="tab nav ${UI.tab === k ? 'on' : ''}" data-act="tab" data-t="${k}" data-fk="tab-${k}">${n}</button>`).join('');
@@ -3253,10 +3360,10 @@ function itemStats(s) {
 }
 function tabBag() {
   const sel = UI.invSel, def = G.armor ? IT[G.armor.id].armor.def : 0; let used = 0; for (let i = 0; i < G.invSize; i++) if (G.inv[i]) used++;
-  let h = `<div class="bag"><div class="bag-l"><div class="eqrow">${slotHTML(G.armor, 'data-act="islot" data-i="armor" data-fk="s-armor"', 'eq' + (sel === 'armor' ? ' on' : '') + (UI.moveFrom === 'armor' ? ' mv' : ''))}<div class="eqtx"><span>防具</span><small>防御 ${def}</small></div><div class="cap">${used} / ${G.invSize}</div></div><div class="grid">`;
+  let h = `<div class="bag"><div class="bag-l"><div class="eqrow">${slotHTML(G.armor, 'data-act="islot" data-i="armor" data-fk="s-armor" data-tip="armor"', 'eq' + (sel === 'armor' ? ' on' : '') + (UI.moveFrom === 'armor' ? ' mv' : ''))}<div class="eqtx"><span>防具</span><small>防御 ${def}</small></div><div class="cap">${used} / ${G.invSize}</div></div><div class="grid">`;
   for (let i = 0; i < 32; i++) {
     if (i >= G.invSize) { h += '<div class="slot lock"></div>'; continue; }
-    h += slotHTML(G.inv[i], `data-act="islot" data-i="${i}" data-fk="s-${i}"`, (i < 8 ? 'hb ' : '') + (sel === i ? 'on ' : '') + (UI.moveFrom === i ? 'mv ' : '') + (G.sel === i ? 'held' : ''));
+    h += slotHTML(G.inv[i], `data-act="islot" data-i="${i}" data-fk="s-${i}" data-tip="inv:${i}"`, (i < 8 ? 'hb ' : '') + (sel === i ? 'on ' : '') + (UI.moveFrom === i ? 'mv ' : '') + (G.sel === i ? 'held' : ''));
   }
   h += `</div><p class="tip">${UI.moveFrom != null ? '入れ替え先の枠を選んでください' : '上の段（1〜8）がホットバー。緑枠が手に持っている物'}</p></div><div class="bag-r">${itemDetail(sel)}</div></div>`;
   return h;
@@ -3297,9 +3404,9 @@ function tabCraft() {
     .sort((a, b) => (b.can - a.can) || (b.hs - a.hs) || (a.r.i - b.r.i));
   for (const { r, can, hs } of list) {
     const d = IT[r.o], mx = can ? maxCraft(r, st) : 0;
-    const req = Object.entries(r.r).map(([k, n]) => { const c = cnt(k); return `<span class="rq ${c >= n ? 'ok' : 'ng'}" title="${esc(IT[k].n)}"><img src="${ICONURL[IT[k].ic] || ''}" alt=""><em>${esc(IT[k].n)} ${Math.min(c, 999)}/${n}</em></span>`; }).join('') +
-      (r.tool ? `<span class="rq ${cnt(r.tool) ? 'ok' : 'ng'}"><img src="${ICONURL[IT[r.tool].ic] || ''}" alt=""><em>${esc(IT[r.tool].n)}が必要</em></span>` : '');
-    h += `<div class="rc ${can ? 'can' : hs ? 'lack' : 'nost'}"><img class="ri" src="${ICONURL[d.ic] || ''}" alt=""><div class="rm"><div class="rn">${esc(d.n)}${r.n > 1 ? ' ×' + r.n : ''}<span class="rs s-${r.s}">${STATION_N[r.s]}</span></div><div class="rd">${esc(d.d || '')}</div><div class="rr">${req}</div></div><div class="rb">` +
+    const req = Object.entries(r.r).map(([k, n]) => { const c = cnt(k); return `<span class="rq ${c >= n ? 'ok' : 'ng'}" data-tip="it:${k}"><img src="${ICONURL[IT[k].ic] || ''}" alt=""><em>${esc(IT[k].n)} ${Math.min(c, 999)}/${n}</em></span>`; }).join('') +
+      (r.tool ? `<span class="rq ${cnt(r.tool) ? 'ok' : 'ng'}" data-tip="it:${r.tool}"><img src="${ICONURL[IT[r.tool].ic] || ''}" alt=""><em>${esc(IT[r.tool].n)}が必要</em></span>` : '');
+    h += `<div class="rc ${can ? 'can' : hs ? 'lack' : 'nost'}"><span class="riw" data-tip="it:${r.o}"><img class="ri" src="${ICONURL[d.ic] || ''}" alt=""></span><div class="rm"><div class="rn">${esc(d.n)}${r.n > 1 ? ' ×' + r.n : ''}<span class="rs s-${r.s}">${STATION_N[r.s]}</span></div><div class="rd">${esc(d.d || '')}</div><div class="rr">${req}</div></div><div class="rb">` +
       `<button class="btn nav ${can ? 'pri' : 'off'}" data-act="craft" data-i="${r.i}" data-n="1" data-fk="cr-${r.i}">作る</button>` + (mx >= 2 ? `<button class="btn sm nav" data-act="craft" data-i="${r.i}" data-n="${Math.min(5, mx)}" data-fk="crm-${r.i}">×${Math.min(5, mx)}</button>` : '') + `</div></div>`;
   }
   if (!list.length) h += '<p class="dim">レシピがありません</p>';
@@ -3316,9 +3423,12 @@ function tabMap() {
 // --- goal ---
 function tabGoal() {
   let h = '<div class="goal">';
-  if (G.quest < QUESTS.length - 1) { const q = QUESTS[G.quest], [c, mx] = q.chk(G); h += `<section><h3>いまの目標</h3><div class="qbox"><b>${esc(q.t)}</b><p>${esc(q.d)}</p>${mx > 1 ? `<div class="pbar"><i style="width:${c / mx * 100}%"></i></div><small>${c} / ${mx}</small>` : ''}</div></section>`; }
+  if (G.quest < QUESTS.length - 1) {
+    const q = QUESTS[G.quest], { it } = qProg(q);
+    h += `<section><h3>いまの目標</h3><div class="qbox"><b>${esc(q.t)}</b><p>${esc(q.d)}</p>${q.any ? '<p class="dim">どちらか1つ達成すればOK</p>' : ''}<ul class="qlist">${it.map(([l, c, m]) => qLine(l, c, m)).join('')}</ul></div></section>`;
+  }
   h += '<section><h3>脱出ルート</h3>';
-  if (G.pages[1]) h += '<div class="routes">' + routes().map(r => { const dn = r.items.filter(x => x[1]).length; return `<div class="route"><div class="rh"><b>${esc(r.n)}</b><small>${dn}/${r.items.length}</small></div><ul>${r.items.map(([n, ok]) => `<li class="${ok ? 'ok' : ''}"><i></i>${esc(n)}</li>`).join('')}</ul></div>`; }).join('') + '</div>';
+  if (G.pages[1]) h += '<div class="routes">' + routes().map(r => { const dn = r.items.filter(x => x[1] >= x[2]).length; return `<div class="route"><div class="rh"><b>${esc(r.n)}</b><small>${dn}/${r.items.length}</small></div><ul class="qlist">${r.items.map(([l, c, m]) => qLine(l, c, m)).join('')}</ul></div>`; }).join('') + '</div>';
   else h += '<p class="dim">島のどこかに、先に漂着した人の手がかりがあるらしい。</p>';
   h += '</section>';
   const tabs = ['tablet_a', 'tablet_b', 'tablet_c'].filter(k => cnt(k)).length + (findAltarN());
@@ -3340,7 +3450,7 @@ function tabJournal() {
   return h + `</div></div><p class="dim center">集めたページ ${pageCount()} / 10</p>`;
 }
 // --- system ---
-const OPTDEF = [['bgm', 'BGMの音量', 'num'], ['se', '効果音の音量', 'num'], ['swapAB', 'A/Bボタンの入れ替え', 'bool'], ['swapXY', 'X/Yボタンの入れ替え', 'bool'], ['touch', 'タッチボタンの大きさ', ['小', '中', '大']], ['dark', '夜の明るさ', ['ふつう', '明るめ']], ['minimap', 'ミニマップ', 'bool'], ['dmgNum', 'ダメージ数字', 'bool'], ['shake', '画面のゆれ', 'bool']];
+const OPTDEF = [['bgm', 'BGMの音量', 'num'], ['se', '効果音の音量', 'num'], ['swapAB', 'A/Bボタンの入れ替え', 'bool'], ['swapXY', 'X/Yボタンの入れ替え', 'bool'], ['touch', 'タッチボタンの大きさ', ['小', '中', '大']], ['dark', '夜の明るさ', ['ふつう', '明るめ']], ['flicker', '光のゆらぎ', 'bool'], ['minimap', 'ミニマップ', 'bool'], ['dmgNum', 'ダメージ数字', 'bool'], ['shake', '画面のゆれ', 'bool']];
 function optsHTML() {
   return '<div class="opts">' + OPTDEF.map(([k, n, ty]) => {
     let c;
@@ -3364,9 +3474,9 @@ function panelHelp() { return '<div class="help">' + HELP.map(([t, d]) => `<sect
 function panelChest() {
   const o = UI.chest, bag = UI.chestBag;
   let h = `<div class="chest"><div class="grid c">`;
-  o.items.forEach((s, i) => h += slotHTML(s, `data-act="ch" data-i="${i}" data-fk="ch-${i}"`));
+  o.items.forEach((s, i) => h += slotHTML(s, `data-act="ch" data-i="${i}" data-fk="ch-${i}" data-tip="ch:${i}"`));
   h += `</div><div class="row">${btn('takeall', 'すべて取り出す')}${bag ? '' : btn('putall', '素材をしまう')}</div><h4>持ち物</h4><div class="grid">`;
-  for (let i = 0; i < G.invSize; i++) h += slotHTML(G.inv[i], `data-act="ci" data-i="${i}" data-fk="ci-${i}"`, i < 8 ? 'hb' : '');
+  for (let i = 0; i < G.invSize; i++) h += slotHTML(G.inv[i], `data-act="ci" data-i="${i}" data-fk="ci-${i}" data-tip="inv:${i}"`, i < 8 ? 'hb' : '');
   return h + `</div><p class="tip">選んだアイテムを反対側へ移します${bag ? '' : '。「素材をしまう」はホットバー以外の素材をまとめてしまいます'}</p></div>`;
 }
 function prow(label, ok, val, act) { return `<div class="prow ${ok ? 'ok' : ''}"><span class="pl">${label}</span><span class="pv">${val}</span>${act || ''}</div>`; }
@@ -3529,7 +3639,7 @@ UI.dlgA = () => {
 
 // ---------- title / game flow ----------
 UI.title = () => {
-  RT.screen = 'title'; G = null; RT.voy = null;
+  RT.screen = 'title'; G = null; RT.voy = null; tipHide();
   document.body.classList.remove('ingame');
   for (const id of ['hud', 'death', 'ending', 'voyhud', 'modal']) $id(id).classList.add('hidden');
   UI.open = null; UI.dq = []; UI.dlg = null; $id('dialog').classList.add('hidden'); RT.boss = null; UI.bossBar(null);
@@ -3567,7 +3677,7 @@ function enterGame(isNew) {
   UI.last = {}; RT.invDirty = true; RT.questDirty = true; UI.invSel = G.sel;
   updateMusic(true);
   if (isNew) UI.say(['……波の音で目を覚ました。', '乗っていた客船は、嵐で沈んでしまったらしい。', 'ここは、どこかの島の砂浜のようだ。', 'まずは辺りに流れ着いた木箱を調べてみよう。'], () => {
-    toast(Inp.mode === 'kb' ? '移動：WASD　調べる：Space　ダッシュ：Shift　バッグ：I　クラフト：C' : Inp.mode === 'pad' ? '移動：左スティック　調べる：A　ダッシュ：B　バッグ：X　クラフト：Y' : '左側をなぞって移動、Ⓐで調べる・使う', '');
+    toast(Inp.mode === 'kb' ? '移動：WASD　調べる：Space　ダッシュ：Shift　バッグ：Bキー　クラフト：C' : Inp.mode === 'pad' ? '移動：左スティック　調べる：A　ダッシュ：B　バッグ：X　クラフト：Y' : '左側をなぞって移動、Ⓐで調べる・使う', '');
   });
   else notice(G.day + '日目');
 }
@@ -3610,6 +3720,7 @@ UI.fade = (cb, hold) => {
   setTimeout(() => { try { if (cb) cb(); } catch (e) { console.error(e); } setTimeout(() => { f.classList.remove('on'); RT.lock = false; }, hold || 160); }, 380);
 };
 UI.update = dt => {
+  if (tipT > 0) { tipT -= dt; if (tipT <= 0) tipHide(); }
   if (UI.dlg && !dlgDone()) { UI.dlg.shown += dt * 46; renderDlgText(); if (dlgDone()) showChoices(); }
   const nx = $id('d-next'); if (nx) nx.style.visibility = UI.dlg && dlgDone() && !UI.dlg.choices ? 'visible' : 'hidden';
   if (RT.screen === 'game' && G) { if (G.mode === 'voyage' && RT.voy) voyHud(); else if (G.mode === 'play' || G.mode === 'dead') hudUpdate(dt); }
@@ -3620,7 +3731,7 @@ UI.update = dt => {
 // =====================================================================
 const KEYMAP = {
   Space: 'A', KeyJ: 'A', KeyZ: 'A', Enter: 'A', NumpadEnter: 'A', ShiftLeft: 'B', ShiftRight: 'B', KeyK: 'B', Backspace: 'B',
-  KeyI: 'X', Tab: 'X', KeyC: 'Y', KeyQ: 'LB', KeyE: 'RB', Escape: 'START', KeyP: 'START', KeyM: 'SELECT',
+  KeyB: 'X', KeyI: 'X', Tab: 'X', KeyC: 'Y', KeyQ: 'LB', KeyE: 'RB', Escape: 'START', KeyP: 'START', KeyM: 'SELECT',
   ArrowUp: 'UP', KeyW: 'UP', ArrowDown: 'DOWN', KeyS: 'DOWN', ArrowLeft: 'LEFT', KeyA: 'LEFT', ArrowRight: 'RIGHT', KeyD: 'RIGHT'
 };
 const Inp = {
@@ -3680,6 +3791,13 @@ const Inp = {
     window.addEventListener('wheel', e => { if (G && RT.screen === 'game' && G.mode === 'play' && !UI.open && !UI.dlg) { G.sel = (G.sel + (e.deltaY > 0 ? 1 : 7)) % 8; invChanged(); } }, { passive: true });
     document.addEventListener('pointerdown', e => { auInit(); if (e.pointerType === 'touch' || e.pointerType === 'pen') this.setMode('touch'); }, true);
     document.addEventListener('mousedown', () => { if (this.mode === 'pad') this.setMode('kb'); }, true);
+    // マウスを乗せたらアイテム情報を出す
+    document.addEventListener('pointermove', e => {
+      if (e.pointerType !== 'mouse') return; UI.navTips = false;
+      const t = e.target && e.target.closest ? e.target.closest('[data-tip]') : null;
+      if (t && G) tipShow(t.dataset.tip, e.clientX, e.clientY); else if (tipSrc) tipHide();
+    }, { passive: true });
+    document.addEventListener('pointerleave', () => tipHide());
     // joystick
     const zone = $id('joyzone'), base = $id('joybase'), knob = $id('joyknob');
     const R = () => 44 * [0.85, 1, 1.2][OPT.touch | 0];
@@ -3742,8 +3860,12 @@ function navFocus(el, quiet) {
   $$('.nav.focus').forEach(e => e.classList.remove('focus'));
   if (!el) return; el.classList.add('focus'); UI.focusKey = el.dataset.fk || UI.focusKey;
   if (Inp.mode !== 'touch' || !quiet) try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { }
+  // コントローラー／キー操作でカーソルを合わせたらアイテム情報を出す
+  if (el.dataset.tip && Inp.mode !== 'touch' && (Inp.mode === 'pad' || UI.navTips)) tipShow(el.dataset.tip, 0, 0, el.getBoundingClientRect());
+  else if (Inp.mode !== 'touch') tipHide();
 }
 function navMove(dx, dy) {
+  UI.navTips = true;
   const root = navRoot(); if (!root) return; const els = navEls(root); if (!els.length) return;
   const cur = root.querySelector('.nav.focus');
   if (!cur || !els.includes(cur)) { navFocus(els[0]); return; }
