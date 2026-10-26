@@ -38,6 +38,7 @@ input { font: inherit; -webkit-user-select: text; user-select: text; touch-actio
 .center { text-align: center; }
 #app { position: fixed; inset: 0; overflow: hidden; }
 #game { position: absolute; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+#game3d { position: absolute; left: 0; top: 0; display: none; touch-action: none; }
 .scroll { touch-action: pan-y; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 
 /* ---------- 共通パーツ ---------- */
