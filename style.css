@@ -66,6 +66,18 @@ body[data-input="pad"] .kB, body[data-input="touch"] .kB { background: #c8443a; 
 
 /* ---------- HUD ---------- */
 #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+/* 一人称：照準・マウス視点の案内 */
+#xhair { display: none; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); pointer-events: none; }
+#xhair::before, #xhair::after { content: ''; position: absolute; background: rgba(255,255,255,.92); box-shadow: 0 0 0 1px rgba(0,0,0,.55); }
+#xhair::before { left: 10px; top: 2px; width: 2px; height: 18px; }
+#xhair::after { left: 2px; top: 10px; width: 18px; height: 2px; }
+#xhair.tgt::before, #xhair.tgt::after { background: #ffe08a; }
+#xhair.bad::before, #xhair.bad::after { background: #ff6a6a; }
+#xhair.place::before, #xhair.place::after { background: #7cff9a; }
+body.fps #xhair { display: block; }
+#lockhint { display: none; position: absolute; left: 50%; top: 58%; transform: translateX(-50%); font-size: 13px; background: rgba(8,20,36,.75); border: 2px solid rgba(217,183,121,.6); padding: 4px 10px; white-space: nowrap; }
+#lookzone { position: absolute; right: 0; top: 0; width: 52%; height: 100%; pointer-events: auto; touch-action: none; display: none; }
+body.fps #lookzone { display: block; }
 #hud-l { position: absolute; left: calc(8px + var(--safe-l)); top: calc(8px + var(--safe-t)); width: min(220px, 46vw); display: flex; flex-direction: column; gap: 6px; }
 #stats { display: flex; flex-direction: column; gap: 3px; background: rgba(8, 20, 36, .62); border: 2px solid rgba(217, 183, 121, .55); padding: 6px 8px; }
 .bar { display: grid; grid-template-columns: 16px 1fr 44px; align-items: center; gap: 6px; font-size: 11px; line-height: 1; }
@@ -103,6 +115,11 @@ body[data-input="pad"] .kB, body[data-input="touch"] .kB { background: #c8443a; 
 #mini { width: 104px; height: 104px; border: 3px solid var(--rope); box-shadow: 0 0 0 2px #000; image-rendering: pixelated; pointer-events: auto; cursor: pointer; background: #081018; }
 #hud-btns { display: flex; gap: 4px; pointer-events: auto; }
 .hb { font-size: 12px; padding: 4px 9px; background: rgba(16, 41, 74, .85); border: 2px solid var(--rope-d); color: var(--sand); }
+.hb:active, .x:active, .tab:active, .slot:active, .hs:active { filter: brightness(1.35); }
+body[data-input="touch"] .hb { min-height: 40px; min-width: 54px; font-size: 13px; padding: 6px 10px; }
+body[data-input="touch"] .x { width: 56px; font-size: 20px; }
+body[data-input="touch"] .tab { min-height: 42px; }
+body[data-input="touch"] .btn { min-height: 40px; }
 #bossbar { position: absolute; left: 50%; top: calc(10px + var(--safe-t)); transform: translateX(-50%); width: min(420px, 56vw); text-align: center; font-size: 14px; text-shadow: 2px 2px 0 #000; }
 #bossbar .track { height: 12px; margin-top: 3px; border-color: #000; }
 #bossbar .track i { background: linear-gradient(#ff6b5a, #c1303f); }
@@ -147,7 +164,7 @@ body:not([data-input="kb"]) .hs u { display: none; }
 .hs.on { border-color: var(--sun); box-shadow: 0 0 0 2px #000, inset 0 0 0 1px var(--sun); transform: translateY(-3px); }
 
 /* ---------- タッチ操作 ---------- */
-#touch { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
+#touch { position: absolute; inset: 0; pointer-events: none; z-index: 9; }
 body:not([data-input="touch"]) #touch, body:not(.ingame) #touch { display: none; }
 #joyzone { position: absolute; left: 0; bottom: 0; width: 48%; height: 64%; pointer-events: auto; touch-action: none; }
 #joyghost { position: absolute; left: calc(76px + var(--safe-l)); bottom: calc(96px + var(--safe-b)); width: 104px; height: 104px; transform: translate(-50%, 50%); border-radius: 50%; border: 3px dashed rgba(255, 255, 255, .18); }
