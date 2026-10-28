@@ -3,101 +3,176 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="DRIFT ISLE">
-<meta name="theme-color" content="#0d2238">
-<meta name="format-detection" content="telephone=no">
-<meta name="description" content="ドット絵の無人島脱出サバイバル。素材を集めて道具を作り、島に残された日記を頼りに脱出しよう。">
-<title>DRIFT ISLE ～無人島脱出記～</title>
+<meta name="apple-mobile-web-app-title" content="CARTRIDGE">
+<title>LOCAL CARTRIDGE | html/css/js プレビューランチャー</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./style.css">
 </head>
-<body data-input="kb">
-<div id="app">
-  <canvas id="game"></canvas>
+<body>
 
-  <!-- ===== HUD ===== -->
-  <div id="hud" class="hidden">
-    <div id="hud-l">
-      <div id="stats">
-        <div class="bar" id="bar-hp"><img id="ic-hp" alt="体力"><div class="track"><i></i></div><b></b></div>
-        <div class="bar" id="bar-food"><img id="ic-food" alt="空腹"><div class="track"><i></i></div><b></b></div>
-        <div class="bar" id="bar-water"><img id="ic-water" alt="水分"><div class="track"><i></i></div><b></b></div>
-        <div class="bar" id="bar-sta"><img id="ic-sta" alt="スタミナ"><div class="track"><i></i></div><b></b></div>
-        <div class="bar" id="bar-temp"><img id="ic-temp" alt="体温"><div class="track"><i></i></div><b></b></div>
+<div class="app">
+
+  <header class="app__header">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true">&#9707;</span>
+      <div class="brand__text">
+        <h1>LOCAL CARTRIDGE</h1>
+        <p>html / css / js を差し込んでその場で実行</p>
       </div>
-      <div id="effects"></div>
-      <div id="quest"></div>
     </div>
-    <div id="hud-r">
-      <div id="clock"></div>
-      <canvas id="mini" width="64" height="64"></canvas>
-      <div id="hud-btns"><button class="hb" data-ui="v3d">3D</button><button class="hb" data-ui="map">地図</button><button class="hb" data-ui="menu">メニュー</button></div>
+    <div class="cache-badge" id="cacheBadge">
+      <span class="cache-badge__dot"></span>
+      <span id="cacheBadgeText">未保存</span>
     </div>
-    <div id="bossbar" class="hidden"><span id="boss-name"></span><div class="track"><i></i></div></div>
-    <div id="notice"></div>
-    <div id="toasts"></div>
-    <div id="bottom">
-      <div id="held-name"></div>
-      <div id="hint"></div>
-      <div id="hotbar"></div>
-    </div>
-  </div>
+  </header>
 
-  <!-- ===== タッチ操作 ===== -->
-  <div id="touch">
-    <div id="joyzone"><div id="joyghost"></div><div id="joybase"><div id="joyknob"></div></div></div>
-    <div id="tbtns">
-      <button class="tb" id="tb-y" data-b="Y" data-cap="クラフト">Y</button>
-      <button class="tb" id="tb-x" data-b="X" data-cap="バッグ">X</button>
-      <button class="tb" id="tb-b" data-b="B" data-cap="ダッシュ">B</button>
-      <button class="tb big" id="tb-a" data-b="A" data-cap="アクション">A</button>
-    </div>
-  </div>
+  <main class="workbench">
 
-  <!-- ===== 航海 ===== -->
-  <div id="voyhud" class="hidden">
-    <div class="vrow"><span>航路</span><div class="track" id="voy-prog"><i></i></div></div>
-    <div class="vrow"><span>いかだ</span><div class="track hp" id="voy-hp"><i></i></div></div>
-    <div id="voy-msg"></div>
-  </div>
+    <!-- 上:テストビルド(testフォルダ内のゲームを切り替え) -->
+    <section class="samples" aria-label="テストビルド">
+      <div class="samples__head">
+        <div class="samples__heading">
+          <h2 class="samples__title">TEST BUILDS</h2>
+          <p class="samples__sub" id="sampleStatus">一覧を読み込み中...</p>
+        </div>
+        <button type="button" class="tool-btn" id="sampleRefreshBtn">再読み込み</button>
+      </div>
+      <div class="samples__list" id="sampleList" role="list"></div>
+    </section>
 
-  <!-- ===== メニュー ===== -->
-  <div id="modal" class="hidden">
-    <div class="panel">
-      <div class="phead"><div id="m-tabs" class="tabs scroll"></div><button id="m-close" class="x nav" data-act="close" data-fk="close" aria-label="閉じる">✕</button></div>
-      <div id="m-body" class="pbody scroll"></div>
-      <div class="pfoot"><span id="m-help"></span></div>
-    </div>
-  </div>
+    <!-- 左:ファイル読み込み -->
+    <section class="side" aria-label="ファイル読み込み">
 
-  <!-- ===== 会話 ===== -->
-  <div id="dialog" class="hidden"><div class="dbox"><div id="d-name"></div><div id="d-text" class="scroll"></div><div id="d-choices"></div><div id="d-next">▼</div></div></div>
+      <label class="bulk" for="input-bulk">
+        <span class="bulk__title">3ファイル or zipを選択</span>
+        <span class="bulk__sub">拡張子で自動振り分け / zipは画像・音声・フォントも読み込み / PCはドラッグ&amp;ドロップも可</span>
+      </label>
+      <input type="file" id="input-bulk" class="file-input" multiple>
 
-  <!-- ===== タイトル ===== -->
-  <div id="title">
-    <div class="t-inner">
-      <div class="logo"><h1><span class="l1">DRIFT</span><span class="l2">ISLE</span></h1><p>～ 無人島脱出記 ～</p></div>
-      <div id="title-menu" class="scroll"></div>
-    </div>
-    <footer class="t-foot"><a href="https://github.com/h1ro223" target="_blank" rel="noopener">made by hiro/ヒロ</a><span>v1.1.0</span></footer>
-  </div>
+      <div class="slot" id="slot-html">
+        <span class="slot__tag slot__tag--html">HTML</span>
+        <div class="slot__body">
+          <p class="slot__name" id="name-html">未選択</p>
+          <p class="slot__meta" id="meta-html">必須</p>
+        </div>
+        <label class="slot__pick" for="input-html">選択</label>
+        <input type="file" id="input-html" class="file-input">
+        <button type="button" class="slot__clear" id="clear-html" aria-label="HTMLを外す" hidden>&times;</button>
+      </div>
 
-  <!-- ===== 倒れたとき ===== -->
-  <div id="death" class="hidden"><div class="dbox2"><h2>力尽きた…</h2><p id="death-msg"></p><button class="tbtn nav" data-act="respawn" data-fk="respawn"><b>目を覚ます</b></button><button class="tbtn nav" data-act="dtitle" data-fk="dtitle"><b>タイトルへ</b></button></div></div>
+      <div class="slot" id="slot-css">
+        <span class="slot__tag slot__tag--css">CSS</span>
+        <div class="slot__body">
+          <p class="slot__name" id="name-css">未選択</p>
+          <p class="slot__meta" id="meta-css">任意</p>
+        </div>
+        <label class="slot__pick" for="input-css">選択</label>
+        <input type="file" id="input-css" class="file-input">
+        <button type="button" class="slot__clear" id="clear-css" aria-label="CSSを外す" hidden>&times;</button>
+      </div>
 
-  <!-- ===== エンディング ===== -->
-  <div id="ending" class="hidden"><div id="end-body" class="scroll"></div></div>
+      <div class="slot" id="slot-js">
+        <span class="slot__tag slot__tag--js">JS</span>
+        <div class="slot__body">
+          <p class="slot__name" id="name-js">未選択</p>
+          <p class="slot__meta" id="meta-js">任意</p>
+        </div>
+        <label class="slot__pick" for="input-js">選択</label>
+        <input type="file" id="input-js" class="file-input">
+        <button type="button" class="slot__clear" id="clear-js" aria-label="JSを外す" hidden>&times;</button>
+      </div>
 
-  <div id="fade"></div>
-  <div id="rotate-tip"><span>横画面にすると遊びやすくなります</span><button id="rt-close" aria-label="閉じる">✕</button></div>
-  <noscript><p class="nojs">このゲームを遊ぶにはJavaScriptを有効にしてください。</p></noscript>
+      <p class="asset-info" id="assetInfo" hidden></p>
+
+      <div class="actions">
+        <button type="button" class="btn btn--primary" id="runBtn" disabled>実行する</button>
+        <button type="button" class="btn btn--sub" id="exportBtn" disabled>1ファイルに書き出し</button>
+        <button type="button" class="btn btn--ghost" id="clearAllBtn">キャッシュ削除</button>
+      </div>
+
+      <p class="log" id="logText">読み込んだファイルはブラウザ内に保存され、次回開いた時も自動で復元されます。</p>
+
+    </section>
+
+    <!-- 右:プレビュー -->
+    <section class="preview" id="preview" aria-label="プレビュー">
+      <div class="preview__bar">
+        <span class="preview__label">PREVIEW</span>
+        <span class="preview__state" id="previewState">未実行</span>
+        <div class="preview__tools">
+          <button type="button" class="tool-btn" id="reloadBtn" disabled>再実行</button>
+          <button type="button" class="tool-btn zoom-btn" id="zoomBtn" aria-label="全画面時の表示倍率を切り替え">表示 90%</button>
+          <button type="button" class="tool-btn" id="fullBtn">全画面</button>
+        </div>
+      </div>
+      <button type="button" class="float-handle" id="floatHandle" aria-label="操作バーを表示(ドラッグで移動)">
+        <span class="float-handle__dots" aria-hidden="true"></span>
+      </button>
+      <div class="preview__stage">
+        <iframe
+          id="previewFrame"
+          title="プレビュー"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-pointer-lock allow-downloads"
+          allow="fullscreen; autoplay; clipboard-write"
+          allowfullscreen
+        ></iframe>
+        <div class="preview__empty" id="previewEmpty">HTMLを読み込むとここに表示されます</div>
+      </div>
+
+      <div class="console" id="consolePanel">
+        <div class="console__bar">
+          <span class="console__title">コンソール</span>
+          <span class="console__count" id="consoleCount" hidden>0</span>
+          <div class="console__tools">
+            <button type="button" class="tool-btn" id="consoleCopyBtn">コピー</button>
+            <button type="button" class="tool-btn" id="consoleClearBtn">クリア</button>
+            <button type="button" class="tool-btn" id="consoleToggleBtn" aria-expanded="true">閉じる</button>
+          </div>
+        </div>
+        <ol class="console__list" id="consoleList"></ol>
+      </div>
+    </section>
+
+    <!-- 下:エディタ -->
+    <section class="editor" aria-label="コードエディタ">
+      <div class="editor__bar">
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab is-active" role="tab" data-tab="html" aria-selected="true">HTML</button>
+          <button type="button" class="tab" role="tab" data-tab="css" aria-selected="false">CSS</button>
+          <button type="button" class="tab" role="tab" data-tab="js" aria-selected="false">JS</button>
+        </div>
+        <span class="editor__note">直接編集・貼り付けもOK(自動保存 / Ctrl+Enterで実行)</span>
+      </div>
+      <textarea
+        id="editor"
+        class="editor__area"
+        spellcheck="false"
+        autocapitalize="off"
+        autocomplete="off"
+        autocorrect="off"
+        wrap="off"
+        placeholder="ここにHTMLを貼り付けることもできます"
+      ></textarea>
+    </section>
+
+  </main>
+
+  <footer class="app__footer">
+    made by <a href="https://github.com/h1ro223" target="_blank" rel="noopener noreferrer">hiro / ヒロ</a>
+  </footer>
+
 </div>
-<script src="./three.min.js"></script>
+
+<div class="drop-overlay" id="dropOverlay" aria-hidden="true">
+  <p>ここにドロップして読み込み</p>
+</div>
+
 <script src="./script.js"></script>
 </body>
 </html>
