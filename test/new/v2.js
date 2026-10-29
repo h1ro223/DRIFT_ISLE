@@ -841,7 +841,7 @@ const state = {
   scene: 'boot', target: null, gather: { o: null, prog: 0, hits: 0 }, holdCd: 0, fishing: null,
   rocks: [], rockTimer: 20, particles: [], floats: [], shake: 0, autosave: 0, fading: false, faintLock: false,
   warn: {}, pendingTalks: [], time: 0, titleT: 0, capToast: 0, drinkCd: 0,
-  place: null, cam: { x: 0, y: 0 }, konami: 0, god: false, hotName: 0,
+  place: null, cam: { x: 0, y: 0 }, konami: 0, konamiGo: false, god: false, hotName: 0,
   stIdle: 0, boltT: 15, flash: 0, conds: [], condHtml: null,
   mobs: [], mobT: 2, atkCd: 0, invuln: 0, swing: 0, noMobs: false,
 };
@@ -1169,6 +1169,7 @@ function setupInput() {
   window.addEventListener('keydown', e => {
     Sound.init();
     if (isTyping()) { if (e.code === 'Enter' || e.code === 'Escape') document.activeElement.blur(); return; }
+    if (konamiKey(e)) { e.preventDefault(); return; }   // 隠しコマンドの B・A はメニュー操作として扱わない
     let m = KEYMAP[e.code]; if (!m) return;
     if (e.code === 'KeyQ' && (e.ctrlKey || e.metaKey)) m = ['DROPALL', 'TABL'];
     e.preventDefault();
@@ -1328,7 +1329,7 @@ const UI = {
   update(dt) {
     const L = this.top(); if (!L) return;
     if (L.mainMenu) {
-      if (konamiStep()) { this.refresh(L); return; }
+      if (state.konamiGo) { state.konamiGo = false; konamiActivate(L); this.refresh(L); return; }
       const sc = ['INV', 'CRAFT', 'MAP'].find(k => Input.press(k));
       if (sc) { const tab = { INV: 'inv', CRAFT: 'craft', MAP: 'map' }[sc]; sfx('ui'); if (L.tab === tab) L.onBack(); else { L.tab = tab; L.focusKey = 'tab-' + tab; this.refresh(L); } return; }
       for (let i = 1; i <= CONFIG.hotSize; i++) if (Input.press('H' + i)) { hotSelect(i - 1); this.refresh(L); return; }
@@ -1594,20 +1595,25 @@ function renderSettings(b, L, fromTitle) {
   }
 }
 /* デバッグ（メニューで ↑↑↓↓←→←→BA） */
-const KONAMI = ['UP', 'UP', 'DOWN', 'DOWN', 'LEFT', 'RIGHT', 'LEFT', 'RIGHT', 'B', 'A'];
-function konamiStep() {
-  const k = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'A', 'B'].find(b => Input.press(b)); if (!k) return false;
-  if (k === KONAMI[state.konami]) {
+const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+// キーボードの ↑ ↑ ↓ ↓ ← → ← → B A だけを受け付ける（コントローラー・WASD・K/Spaceなどでは開かない）。
+// メインメニューを開いている間だけ判定し、最後の B・A は持ち物ショートカット／左移動として扱わない。
+function konamiKey(e) {
+  const top = UI.top();
+  if (!top || !top.mainMenu) { state.konami = 0; return false; }
+  if (e.repeat || ['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)) return false;
+  if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) { state.konami = 0; return false; }
+  if (e.code === KONAMI[state.konami]) {
     state.konami++;
-    if (state.konami >= 9) Input.consume(k);   // 最後のB・Aはメニュー操作に使わない
-    if (state.konami >= KONAMI.length) {
-      state.konami = 0;
-      if (!settings.debug) { settings.debug = true; saveSettings(); sfx('unlock'); toast('デバッグメニューを表示しました（設定の右）', 'good'); }
-      const L = UI.top(); if (L) { L.tab = 'debug'; L.focusKey = 'tab-debug'; }
-      return true;
-    }
-  } else state.konami = k === 'UP' ? 1 : 0;
+    if (state.konami >= KONAMI.length) { state.konami = 0; state.konamiGo = true; }
+    return e.code === 'KeyB' || e.code === 'KeyA';   // B・Aは「持ち物」「左移動」として働かせない
+  }
+  state.konami = e.code === KONAMI[0] ? 1 : 0;      // 順番を間違えたら最初から（↑から始め直しはOK）
   return false;
+}
+function konamiActivate(L) {
+  if (!settings.debug) { settings.debug = true; saveSettings(); sfx('unlock'); toast('デバッグメニューを表示しました（設定の右）', 'good'); }
+  L.tab = 'debug'; L.focusKey = 'tab-debug';
 }
 function hourToTime(hr) { return hr >= 6 && hr < 20 ? (hr - 6) / 14 * CONFIG.dayPart : CONFIG.dayPart + ((hr - 20 + 24) % 24) / 10 * (CONFIG.dayLength - CONFIG.dayPart); }
 function renderDebug(b, L) {
