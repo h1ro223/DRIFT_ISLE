@@ -1865,8 +1865,10 @@
     const base = projectBase(project);
     let list = [];
     let manifestOk = false;
+    let manifestMissing = false; // jsonがまだ無い(404) = 警告ではなく案内だけ
     try {
       const res = await fetch(base + project.manifest, { cache: 'no-cache' });
+      if (res.status === 404) manifestMissing = true;
       if (res.ok) {
         const data = await res.json();
         const arr = Array.isArray(data) ? data : (data && Array.isArray(data.versions) ? data.versions : []);
@@ -1901,8 +1903,10 @@
       warn = true;
     } else {
       text = `${versions.length}バージョン / 最新 ${versions[versions.length - 1].version}`;
-      if (!manifestOk) {
-        text += '(versions.json が読めないため、zipだけで表示中)';
+      if (!manifestOk && manifestMissing) {
+        text += '(versions.json 未作成のため更新内容なし)';
+      } else if (!manifestOk) {
+        text += '(versions.json の書き方に誤りがあり読めません)';
         warn = true;
       } else if (probed) {
         text += `(${probed}件は更新内容が未記入)`;
@@ -2136,9 +2140,21 @@
     if (!buildEls.root) return;
     renderTabs();
     const project = projectById(buildState.tab) || BUILDS.projects[0];
+    // バージョン用のチケット並び(グリッド)と、固定ビルドの起動ボタンでレイアウトを切り替える
+    buildEls.list.classList.toggle('is-folder', project.type !== 'versions');
     if (project.type === 'versions') renderVersionsPanel(project);
     else renderFolderPanel(project);
-    buildEls.reload.disabled = !playingBuild();
+
+    // 再読み込みボタン:このタブのビルドをプレイ中の時だけ「何を読み直すか」を出して表示
+    // (固定ビルドは起動ボタン自体が「読み直す」になるので出さない)
+    const playing = playingBuild();
+    const showReload = !!(playing && playing.project === project.id && project.type === 'versions');
+    buildEls.reload.hidden = !showReload;
+    buildEls.reload.disabled = !showReload || !!buildState.busyKey;
+    if (showReload) {
+      buildEls.reload.textContent = `↻ ${playing.version} を読み直す`;
+      buildEls.reload.title = `プレイ中の ${playing.version} を最新ファイルで読み直す`;
+    }
   }
 
   // ---------- 読み込み ----------

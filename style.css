@@ -213,15 +213,17 @@ button { color: inherit; }
 }
 .chip-btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
 .chip-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.chip-btn[hidden] { display: none; }
 
 /* バージョン(チケット風) */
 .versions {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 10px;
-  max-height: 238px;
+  max-height: 252px;
   overflow-y: auto;
-  padding: 2px 6px 6px 2px;
+  /* 上はLATEST札(はみ出し分)、左右はチケットの切れ込みが切れないよう余白を確保 */
+  padding: 12px 8px 8px 6px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -284,6 +286,14 @@ button { color: inherit; }
 .ver:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 
 @keyframes pulse { to { opacity: 0.45; } }
+
+/* 固定ビルドの時はグリッドをやめて、起動ボタンを横幅いっぱいに置く */
+.versions.is-folder {
+  display: block;
+  max-height: none;
+  overflow: visible;
+  padding: 0 4px 4px 0;
+}
 
 /* 固定ビルドの起動ボタン */
 .launch {
