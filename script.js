@@ -2,6 +2,7 @@
   'use strict';
 
   const TYPES = ['html', 'css', 'js'];
+  let buildsReady = false; // ビルド一覧のUIが使える状態か
   const LABEL = { html: 'HTML', css: 'CSS', js: 'JS' };
   const DEFAULT_NAME = { html: 'index.html', css: 'style.css', js: 'script.js' };
   const PLACEHOLDER = {
@@ -487,6 +488,8 @@
     renderButtons();
     renderAssetInfo();
     renderBadge();
+    // アップロード等でビルド以外に切り替わった時、ビルド側の「プレイ中」表示を更新
+    if (buildsReady) renderBuilds();
   }
 
   function markPreviewStale() {
@@ -741,7 +744,7 @@
 
   // GitHub Pages上のフォルダを読み込む
   function folderBaseUrl(name) {
-    return new URL(`./${encodeURIComponent(SAMPLE.dir)}/${encodeURIComponent(name)}/`, location.href).href;
+    return new URL(`./${encodeURIComponent(BUILDS.dir)}/${encodeURIComponent(name)}/`, location.href).href;
   }
 
   async function fetchFolderFile(base, rel) {
@@ -827,7 +830,6 @@
     setLog(`${label} を読み込み中...`);
     try {
       const summary = await loader((done, total) => setLog(`${label} を読み込み中... ${done}/${total}`));
-      document.querySelectorAll('.sample-card.is-current').forEach((el) => el.classList.remove('is-current'));
       if (hooks && hooks.success) hooks.success();
       const message = `${label} を読み込みました(アセット${summary.count}ファイル / ${formatSize(summary.bytes)})`;
       if (summary.failed && summary.failed.length) {
@@ -836,7 +838,7 @@
         setLog(message, 'ok');
       }
       await runPreview();
-      if (window.matchMedia('(max-width: 800px)').matches) {
+      if (!(hooks && hooks.noScroll) && window.matchMedia('(max-width: 960px)').matches) {
         els.preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       return true;
@@ -921,7 +923,6 @@
     setLog(parts.join('  ') || '読み込めるファイルがありませんでした。', notes.length ? 'warn' : 'ok');
 
     if (loaded.length) {
-      document.querySelectorAll('.sample-card.is-current').forEach((el) => el.classList.remove('is-current'));
       await saveNow();
       if (state.code.html.trim()) runPreview();
     }
@@ -1305,7 +1306,6 @@
     els.previewState.textContent = '未実行';
     els.previewState.classList.remove('is-stale');
     els.editor.value = '';
-    document.querySelectorAll('.sample-card.is-current').forEach((el) => el.classList.remove('is-current'));
     clearConsole();
     renderAll();
     setLog('キャッシュを削除しました。', 'ok');
@@ -1754,142 +1754,479 @@
   });
 
   // ============================================================
-  //  テストビルド(test フォルダ内のゲームを読み込む)
-  //  ★ゲームを増やす時は SAMPLE.items に1行足すだけでOK
-  //    name : test フォルダ内のフォルダ名(またはzip名)
-  //    kind : 'dir' = フォルダ / 'zip' = test/〇〇.zip
-  //    files: null なら index.html が読み込むCSS/JSを自動で探す
-  //           (画像・音声などは実行時に仮想サーバーが直接読みに行く)
+  //  ビルド切り替え(test フォルダ)
+  //  new : test/new/v1.zip, v2.zip ... をバージョンで切り替え
+  //        更新内容は test/new/versions.json に書く
+  //        (jsonに書き忘れたzipも v〇.zip の連番なら自動で見つけて並べる)
+  //  old : test/old/ フォルダをそのまま起動(開発終了・固定)
+  //  ※セーブデータは同じブラウザ内で全バージョン共有
   // ============================================================
-  const SAMPLE = {
+  const BUILDS = {
     dir: 'test',
-    items: [
-      { name: 'new', kind: 'dir', files: null, badge: 'NEW', label: '無人島サバイバル債務録' },
-      { name: 'old', kind: 'dir', files: null, badge: 'OLD', label: 'DRIFT ISLE ～無人島脱出記～' },
+    projects: [
+      { id: 'new', badge: 'NEW', title: '無人島サバイバル債務録', type: 'versions', manifest: 'versions.json' },
+      { id: 'old', badge: 'OLD', title: 'DRIFT ISLE ～無人島脱出記～', type: 'folder', note: '開発を終了した旧作です。比較用にそのまま残しています。' },
     ],
-  };
-  SAMPLE.labels = {};
-  SAMPLE.items.forEach((item) => { SAMPLE.labels[item.name] = item.label; });
-
-  const sampleEls = {
-    root: document.querySelector('.samples'),
-    list: $('sampleList'),
-    status: $('sampleStatus'),
-    refresh: $('sampleRefreshBtn'),
+    maxProbe: 200, // zip自動検出の上限
+    currentKey: 'pd_current_build', // 最後に起動したビルド
+    tabKey: 'pd_build_tab', // 最後に開いていたタブ
+    workshopKey: 'pd_workshop_open',
   };
 
-  // 固定リストなのでGitHub APIは使わない(リポジトリ名に依存せず、ローカルでも動く)
-  async function fetchSampleList() {
-    return { items: SAMPLE.items.map((item) => Object.assign({}, item)), source: 'list' };
+  const buildEls = {
+    root: $('builds'),
+    tabs: $('buildTabs'),
+    title: $('buildTitle'),
+    status: $('buildStatus'),
+    list: $('versionList'),
+    notes: $('notesList'),
+    reload: $('buildReloadBtn'),
+    workshop: $('workshop'),
+    workshopToggle: $('workshopToggle'),
+  };
+
+  const buildState = {
+    tab: 'new',
+    selected: {}, // 履歴で強調するバージョン(プロジェクトごと)
+    versions: {}, // { new: [{ version, file, date, title, added, fixed, changed, notes }] }
+    status: {}, // { new: { text, warn } }
+    ready: {},
+    busyKey: '',
+  };
+
+  const projectById = (id) => BUILDS.projects.find((p) => p.id === id) || null;
+  const buildKey = (project, version) => (version ? `${project}-${version}` : project);
+
+  function readJSON(key) {
+    try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) { return null; }
+  }
+  function writeJSON(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) { /* 何もしない */ }
   }
 
-  function sampleZipUrl(name) {
-    return `./${encodeURIComponent(SAMPLE.dir)}/${encodeURIComponent(name)}.zip`;
+  // 今プレビューで動いているビルド(アップロード等で別の物に変わったらnull)
+  function playingBuild() {
+    const cur = readJSON(BUILDS.currentKey);
+    if (!cur || !cur.project || state.mode !== 'zip') return null;
+    return state.zipName === buildKey(cur.project, cur.version) ? cur : null;
   }
 
-  async function fetchSampleZip(name) {
-    const res = await fetch(sampleZipUrl(name), { cache: 'no-cache' });
-    if (!res.ok) throw new Error(`zipを取得できませんでした(HTTP ${res.status})`);
-    return res.arrayBuffer();
+  function projectBase(project) {
+    return new URL(`./${encodeURIComponent(BUILDS.dir)}/${encodeURIComponent(project.id)}/`, location.href).href;
   }
 
-  function renderSamples(items, source) {
-    sampleEls.list.innerHTML = '';
-    if (!items.length) {
-      const p = document.createElement('p');
-      p.className = 'samples__empty';
-      p.textContent = 'サンプルがありません';
-      sampleEls.list.appendChild(p);
-      return;
+  // "v12" "v1.2" "1.3.0" などを数字の配列にして比較
+  function versionParts(v) {
+    const m = String(v).match(/\d+(?:\.\d+)*/);
+    return m ? m[0].split('.').map(Number) : [0];
+  }
+  function compareVersion(a, b) {
+    const pa = versionParts(a);
+    const pb = versionParts(b);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+      const d = (pa[i] || 0) - (pb[i] || 0);
+      if (d) return d;
     }
-    items.forEach((item) => {
+    return String(a).localeCompare(String(b));
+  }
+
+  const toList = (v) => (Array.isArray(v) ? v : (v ? [v] : []))
+    .map((x) => String(x).trim()).filter(Boolean);
+
+  function normalizeVersion(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    let version = String(raw.version || raw.id || '').trim();
+    if (!version && raw.file) version = String(raw.file).replace(/\.zip$/i, '');
+    if (!version) return null;
+    if (/^\d/.test(version)) version = `v${version}`;
+    return {
+      version,
+      file: String(raw.file || `${version}.zip`).trim(),
+      date: String(raw.date || '').trim(),
+      title: String(raw.title || '').trim(),
+      added: toList(raw.added),
+      fixed: toList(raw.fixed),
+      changed: toList(raw.changed),
+      notes: toList(raw.notes || raw.note),
+      listed: true,
+    };
+  }
+
+  async function zipExists(url) {
+    try {
+      const res = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
+      return res.ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function fetchVersions(project) {
+    const base = projectBase(project);
+    let list = [];
+    let manifestOk = false;
+    try {
+      const res = await fetch(base + project.manifest, { cache: 'no-cache' });
+      if (res.ok) {
+        const data = await res.json();
+        const arr = Array.isArray(data) ? data : (data && Array.isArray(data.versions) ? data.versions : []);
+        if (data && !Array.isArray(data) && data.title) project.title = String(data.title);
+        list = arr.map(normalizeVersion).filter(Boolean);
+        manifestOk = true;
+      }
+    } catch (_) { /* jsonが無い・壊れている時はzipの自動検出だけで続行 */ }
+
+    // 重複を除く(後に書いた方を優先)
+    const map = new Map();
+    list.forEach((v) => map.set(v.version, v));
+
+    // jsonに無い v〇.zip を連番で探す(最大番号の次から、見つからなくなるまで)
+    let n = 0;
+    map.forEach((v) => { const p = versionParts(v.version); if (p.length === 1) n = Math.max(n, p[0]); });
+    let probed = 0;
+    for (let i = n + 1; i <= BUILDS.maxProbe; i += 1) {
+      const name = `v${i}`;
+      if (map.has(name)) continue;
+      if (!(await zipExists(base + `${name}.zip`))) break;
+      map.set(name, normalizeVersion({ version: name }));
+      map.get(name).listed = false;
+      probed += 1;
+    }
+
+    const versions = Array.from(map.values()).sort((a, b) => compareVersion(a.version, b.version));
+    let text;
+    let warn = false;
+    if (!versions.length) {
+      text = `test/${project.id}/ に v1.zip などが見つかりません`;
+      warn = true;
+    } else {
+      text = `${versions.length}バージョン / 最新 ${versions[versions.length - 1].version}`;
+      if (!manifestOk) {
+        text += '(versions.json が読めないため、zipだけで表示中)';
+        warn = true;
+      } else if (probed) {
+        text += `(${probed}件は更新内容が未記入)`;
+      }
+    }
+    return { versions, status: { text, warn } };
+  }
+
+  // ---------- 描画 ----------
+  function renderTabs() {
+    const playing = playingBuild();
+    buildEls.tabs.innerHTML = '';
+    BUILDS.projects.forEach((project) => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'sample-card';
-      btn.setAttribute('role', 'listitem');
-      btn.dataset.name = item.name;
-      if (state.mode === 'zip' && state.zipName === item.name) btn.classList.add('is-current');
+      btn.className = `ptab ptab--${project.badge.toLowerCase()}`;
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', String(buildState.tab === project.id));
+      if (buildState.tab === project.id) btn.classList.add('is-active');
+      if (playing && playing.project === project.id) btn.classList.add('is-playing');
 
       const badge = document.createElement('span');
-      badge.className = 'sample-card__badge';
-      badge.textContent = item.badge || item.name.slice(0, 3).toUpperCase();
-      if (item.badge) btn.classList.add(`sample-card--${item.badge.toLowerCase()}`);
-
-      const text = document.createElement('span');
-      text.className = 'sample-card__text';
-      const title = document.createElement('span');
-      title.className = 'sample-card__title';
-      title.textContent = SAMPLE.labels[item.name] || item.name;
-      const file = document.createElement('span');
-      file.className = 'sample-card__file';
-      if (item.kind === 'zip') {
-        file.textContent = `${SAMPLE.dir}/${item.name}.zip`;
-      } else if (Array.isArray(item.files)) {
-        file.textContent = `${SAMPLE.dir}/${item.name}/ ${item.files.length}ファイル`;
+      badge.className = 'ptab__badge';
+      badge.textContent = project.badge;
+      const name = document.createElement('span');
+      name.className = 'ptab__name';
+      name.textContent = project.title;
+      const meta = document.createElement('span');
+      meta.className = 'ptab__meta';
+      if (project.type === 'versions') {
+        const vs = buildState.versions[project.id];
+        meta.textContent = vs ? (vs.length ? `${vs.length} builds` : 'no builds') : 'loading...';
       } else {
-        file.textContent = `${SAMPLE.dir}/${item.name}/`;
+        meta.textContent = 'fixed';
       }
-      text.append(title, file);
-
-      btn.append(badge, text);
-      btn.addEventListener('click', () => loadSample(item, btn));
-      sampleEls.list.appendChild(btn);
+      btn.append(badge, name, meta);
+      btn.addEventListener('click', () => {
+        buildState.tab = project.id;
+        writeJSON(BUILDS.tabKey, project.id);
+        renderBuilds();
+      });
+      buildEls.tabs.appendChild(btn);
     });
-
-    sampleEls.status.classList.remove('is-warn');
-    sampleEls.status.textContent = `${items.length}本 / タップで切り替えて実行`;
   }
 
-  async function refreshSamples(force) {
-    sampleEls.refresh.disabled = true;
-    sampleEls.status.classList.remove('is-warn');
-    sampleEls.status.textContent = '一覧を読み込み中...';
-    const { items, source } = await fetchSampleList(force);
-    renderSamples(items, source);
-    sampleEls.refresh.disabled = false;
+  function makeTagItem(kind, label, text) {
+    const li = document.createElement('li');
+    li.className = 'note__item';
+    const tag = document.createElement('i');
+    tag.className = `tag tag--${kind}`;
+    tag.textContent = label;
+    const span = document.createElement('span');
+    span.textContent = text;
+    li.append(tag, span);
+    return li;
   }
 
-  async function loadSample(item, card) {
-    const label = SAMPLE.labels[item.name] || item.name;
-    const source = item.kind === 'zip' ? `${item.name}.zip` : `${item.name}/`;
-    await importPackage(`${label}(${source})`, async (progress) => {
-      if (item.kind === 'zip') {
-        return loadZipBuffer(await fetchSampleZip(item.name), item.name);
+  function renderVersionsPanel(project) {
+    const versions = buildState.versions[project.id];
+    const playing = playingBuild();
+    const st = buildState.status[project.id];
+    buildEls.title.textContent = 'バージョン';
+    buildEls.status.textContent = st ? st.text : 'バージョン一覧を読み込み中...';
+    buildEls.status.classList.toggle('is-warn', !!(st && st.warn));
+    buildEls.list.innerHTML = '';
+    buildEls.notes.innerHTML = '';
+    if (!versions) return;
+
+    if (!versions.length) {
+      const p = document.createElement('p');
+      p.className = 'builds__empty';
+      p.textContent = 'test/new/ に v1.zip を置くとここに表示されます。';
+      buildEls.list.appendChild(p);
+      return;
+    }
+
+    const latest = versions[versions.length - 1].version;
+    const selected = buildState.selected[project.id]
+      || (playing && playing.project === project.id ? playing.version : latest);
+
+    // 新しい順に並べる
+    versions.slice().reverse().forEach((v) => {
+      const key = buildKey(project.id, v.version);
+      const isCurrent = !!(playing && playing.project === project.id && playing.version === v.version);
+
+      // チケット
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ver';
+      btn.setAttribute('role', 'listitem');
+      btn.dataset.key = key;
+      btn.title = `${v.version} をプレイ`;
+      if (isCurrent) btn.classList.add('is-current');
+      if (v.version === selected) btn.classList.add('is-selected');
+      if (buildState.busyKey === key) btn.classList.add('is-loading');
+      const num = document.createElement('span');
+      num.className = 'ver__num';
+      num.textContent = v.version;
+      const date = document.createElement('span');
+      date.className = 'ver__date';
+      date.textContent = v.date || v.file;
+      btn.append(num, date);
+      if (v.version === latest) {
+        const flag = document.createElement('span');
+        flag.className = 'ver__flag';
+        flag.textContent = 'LATEST';
+        btn.appendChild(flag);
       }
-      try {
-        return await loadFolder(item.name, item.files, progress);
-      } catch (err) {
-        // 一覧が取れていない時だけ、同名のzipも試す
-        if (err && err.code === 'NO_INDEX' && !item.files) {
-          return loadZipBuffer(await fetchSampleZip(item.name), item.name);
-        }
-        throw err;
+      btn.addEventListener('click', () => loadBuild(project, v));
+      buildEls.list.appendChild(btn);
+
+      // 更新履歴
+      const li = document.createElement('li');
+      li.className = 'note';
+      if (v.version === latest) li.classList.add('is-latest');
+      if (isCurrent) li.classList.add('is-current');
+      if (v.version === selected) li.classList.add('is-selected');
+      li.dataset.version = v.version;
+
+      const card = document.createElement('div');
+      card.className = 'note__card';
+      const head = document.createElement('div');
+      head.className = 'note__head';
+      const ver = document.createElement('span');
+      ver.className = 'note__ver';
+      ver.textContent = v.version;
+      head.appendChild(ver);
+      if (v.date) {
+        const d = document.createElement('span');
+        d.className = 'note__date';
+        d.textContent = v.date;
+        head.appendChild(d);
       }
+      if (v.version === latest) {
+        const b = document.createElement('span');
+        b.className = 'note__badge note__badge--latest';
+        b.textContent = 'LATEST';
+        head.appendChild(b);
+      }
+      if (isCurrent) {
+        const b = document.createElement('span');
+        b.className = 'note__badge note__badge--current';
+        b.textContent = 'PLAYING';
+        head.appendChild(b);
+      }
+      const play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'note__play';
+      play.textContent = isCurrent ? '↻ 読み直す' : '▶ 遊ぶ';
+      play.addEventListener('click', () => loadBuild(project, v));
+      head.appendChild(play);
+      card.appendChild(head);
+
+      if (v.title) {
+        const t = document.createElement('p');
+        t.className = 'note__title';
+        t.textContent = v.title;
+        card.appendChild(t);
+      }
+      const group = document.createElement('ul');
+      group.className = 'note__group';
+      v.added.forEach((x) => group.appendChild(makeTagItem('add', '追加', x)));
+      v.fixed.forEach((x) => group.appendChild(makeTagItem('fix', '修正', x)));
+      v.changed.forEach((x) => group.appendChild(makeTagItem('chg', '変更', x)));
+      v.notes.forEach((x) => group.appendChild(makeTagItem('chg', 'メモ', x)));
+      if (group.children.length) {
+        card.appendChild(group);
+      } else if (!v.title) {
+        const none = document.createElement('p');
+        none.className = 'note__none';
+        none.textContent = v.listed ? '更新内容の記載なし' : 'versions.json に未記入です';
+        card.appendChild(none);
+      }
+      li.appendChild(card);
+      buildEls.notes.appendChild(li);
+    });
+  }
+
+  function renderFolderPanel(project) {
+    const playing = playingBuild();
+    const isCurrent = !!(playing && playing.project === project.id);
+    const key = buildKey(project.id);
+    buildEls.title.textContent = project.title;
+    buildEls.status.textContent = `test/${project.id}/ ・固定ビルド`;
+    buildEls.status.classList.remove('is-warn');
+    buildEls.list.innerHTML = '';
+    buildEls.notes.innerHTML = '';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'launch';
+    if (isCurrent) btn.classList.add('is-current');
+    if (buildState.busyKey === key) btn.classList.add('is-loading');
+    const icon = document.createElement('span');
+    icon.className = 'launch__icon';
+    icon.textContent = isCurrent ? '↻' : '▶';
+    const text = document.createElement('span');
+    text.className = 'launch__text';
+    const strong = document.createElement('strong');
+    strong.textContent = isCurrent ? 'プレイ中(タップで読み直す)' : 'このビルドで遊ぶ';
+    const small = document.createElement('small');
+    small.textContent = `test/${project.id}/`;
+    text.append(strong, small);
+    btn.append(icon, text);
+    btn.addEventListener('click', () => loadBuild(project, null));
+    buildEls.list.appendChild(btn);
+
+    const li = document.createElement('li');
+    li.className = 'note is-latest';
+    if (isCurrent) li.classList.add('is-current');
+    const card = document.createElement('div');
+    card.className = 'note__card';
+    const head = document.createElement('div');
+    head.className = 'note__head';
+    const ver = document.createElement('span');
+    ver.className = 'note__ver';
+    ver.textContent = project.badge;
+    const b = document.createElement('span');
+    b.className = 'note__badge note__badge--latest';
+    b.textContent = 'FIXED';
+    head.append(ver, b);
+    const p = document.createElement('p');
+    p.className = 'note__title';
+    p.textContent = project.note || '';
+    card.append(head, p);
+    li.appendChild(card);
+    buildEls.notes.appendChild(li);
+  }
+
+  function renderBuilds() {
+    if (!buildEls.root) return;
+    renderTabs();
+    const project = projectById(buildState.tab) || BUILDS.projects[0];
+    if (project.type === 'versions') renderVersionsPanel(project);
+    else renderFolderPanel(project);
+    buildEls.reload.disabled = !playingBuild();
+  }
+
+  // ---------- 読み込み ----------
+  async function loadBuild(project, v, opts) {
+    const key = buildKey(project.id, v ? v.version : '');
+    const label = v ? `${project.title} ${v.version}` : project.title;
+    if (v) buildState.selected[project.id] = v.version;
+    return importPackage(label, async (progress) => {
+      if (v) {
+        const res = await fetch(projectBase(project) + encodePath(v.file), { cache: 'no-cache' });
+        if (!res.ok) throw new Error(`${v.file} を取得できませんでした(HTTP ${res.status})`);
+        return loadZipBuffer(await res.arrayBuffer(), key);
+      }
+      // フォルダ:index.htmlが読み込むCSS/JSを自動で探して読み込む
+      const summary = await loadFolder(project.id, null, progress);
+      state.zipName = key;
+      return summary;
     }, {
+      noScroll: !!(opts && opts.noScroll),
       start: () => {
-        sampleEls.root.classList.add('is-busy');
-        card.classList.add('is-loading');
+        buildState.busyKey = key;
+        buildEls.root.classList.add('is-busy');
+        renderBuilds();
       },
       success: () => {
-        card.classList.add('is-current');
+        writeJSON(BUILDS.currentKey, { project: project.id, version: v ? v.version : '' });
       },
       end: () => {
-        sampleEls.root.classList.remove('is-busy');
-        card.classList.remove('is-loading');
+        buildState.busyKey = '';
+        buildEls.root.classList.remove('is-busy');
+        renderBuilds();
       },
     });
   }
 
-  // 「再読み込み」:今開いているテストビルドを最新ファイルで読み直す
-  sampleEls.refresh.addEventListener('click', () => {
-    const cur = state.mode === 'zip' && SAMPLE.items.find((item) => item.name === state.zipName);
-    const card = cur && sampleEls.list.querySelector(`.sample-card[data-name="${cur.name}"]`);
-    if (cur && card) {
-      loadSample(cur, card);
-    } else {
-      setLog('テストビルドを選ぶと、ここで最新ファイルに読み直せます。', 'warn');
+  buildEls.reload.addEventListener('click', () => {
+    const cur = playingBuild();
+    if (!cur) {
+      setLog('ビルドを起動すると、ここで最新ファイルに読み直せます。', 'warn');
+      return;
     }
+    const project = projectById(cur.project);
+    if (!project) return;
+    if (project.type !== 'versions') {
+      loadBuild(project, null);
+      return;
+    }
+    const v = (buildState.versions[project.id] || []).find((x) => x.version === cur.version)
+      || normalizeVersion({ version: cur.version });
+    loadBuild(project, v);
   });
+
+  // ---------- 開発ツール(WORKSHOP)の開閉 ----------
+  function setWorkshop(open) {
+    buildEls.workshop.classList.toggle('is-open', open);
+    buildEls.workshopToggle.setAttribute('aria-expanded', String(open));
+    writeJSON(BUILDS.workshopKey, open);
+  }
+  buildEls.workshopToggle.addEventListener('click', () => {
+    setWorkshop(!buildEls.workshop.classList.contains('is-open'));
+  });
+
+  // 起動時:一覧を取得して、初回(何も復元されなかった時)は最新版を自動で起動
+  async function initBuilds(restored) {
+    setWorkshop(readJSON(BUILDS.workshopKey) === true);
+    const cur = readJSON(BUILDS.currentKey);
+    const savedTab = readJSON(BUILDS.tabKey);
+    buildState.tab = (cur && projectById(cur.project) && playingBuild()) ? cur.project
+      : (projectById(savedTab) ? savedTab : BUILDS.projects[0].id);
+    renderBuilds();
+
+    await Promise.all(BUILDS.projects.filter((p) => p.type === 'versions').map(async (project) => {
+      const { versions, status } = await fetchVersions(project);
+      buildState.versions[project.id] = versions;
+      buildState.status[project.id] = status;
+    }));
+    renderBuilds();
+
+    if (!restored && !state.code.html.trim()) {
+      const first = BUILDS.projects[0];
+      if (first.type === 'versions') {
+        const vs = buildState.versions[first.id] || [];
+        if (vs.length) await loadBuild(first, vs[vs.length - 1], { noScroll: true });
+      } else {
+        await loadBuild(first, null, { noScroll: true });
+      }
+    }
+  }
 
   // ============================================================
   //  初期化
@@ -1902,12 +2239,13 @@
     const restored = await loadProject();
     renderAll();
     showTab(activeTab);
-    refreshSamples(false);
     if (restored) {
       const source = state.sourceKind === 'dir' ? `${state.zipName}/` : `${state.zipName}.zip`;
       setLog(state.mode === 'zip' ? `前回の内容(${source})を復元しました。` : '前回の内容を復元しました。', 'ok');
       if (state.code.html.trim()) runPreview();
     }
+    buildsReady = true;
+    initBuilds(restored).catch(() => renderBuilds());
   }
 
   init();
