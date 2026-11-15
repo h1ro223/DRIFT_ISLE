@@ -62,6 +62,7 @@
         <div class="notes__head">
           <h2 class="notes__title">更新履歴</h2>
           <span class="notes__legend"><i class="tag tag--add">追加</i><i class="tag tag--fix">修正</i><i class="tag tag--chg">変更</i></span>
+          <button type="button" class="notes__expand" id="notesExpandBtn" aria-haspopup="dialog">⤢ 大きく見る</button>
         </div>
         <ol class="notes__list" id="notesList"></ol>
       </section>
@@ -199,6 +200,21 @@
     </div>
   </section>
 
+</div>
+
+<!-- 更新履歴の拡大表示(ポップアップ) -->
+<div class="modal" id="notesModal" role="dialog" aria-modal="true" aria-labelledby="notesModalTitle" hidden>
+  <div class="modal__card">
+    <div class="modal__head">
+      <div class="modal__headtext">
+        <h2 id="notesModalTitle">更新履歴</h2>
+        <p id="notesModalSub"></p>
+      </div>
+      <span class="notes__legend modal__legend"><i class="tag tag--add">追加</i><i class="tag tag--fix">修正</i><i class="tag tag--chg">変更</i></span>
+      <button type="button" class="modal__close" id="notesModalClose" aria-label="閉じる">&times;</button>
+    </div>
+    <ol class="modal__list" id="notesModalList"></ol>
+  </div>
 </div>
 
 <div class="drop-overlay" id="dropOverlay" aria-hidden="true">

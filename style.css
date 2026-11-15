@@ -352,6 +352,24 @@ button { color: inherit; }
 .notes__title { margin: 0; font-size: 15px; font-weight: 900; }
 .notes__legend { display: flex; gap: 4px; }
 
+/* パネル全体をタップすると拡大表示(ポップアップ)が開く */
+.notes { cursor: pointer; }
+@media (hover: hover) {
+  .notes:hover { box-shadow: 6px 6px 0 var(--sea); }
+}
+.notes__expand {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--sun-soft);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.notes__expand:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+
 .tag {
   font-style: normal;
   font-size: 10.5px;
@@ -919,6 +937,107 @@ button { color: inherit; }
   -webkit-touch-callout: default;
 }
 .editor__area::placeholder { color: #6d6658; }
+
+/* ---------- 更新履歴の拡大表示(ポップアップ) ---------- */
+body.is-modal-open { overflow: hidden; }
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(16px, env(safe-area-inset-top, 0px))
+    max(16px, env(safe-area-inset-right, 0px))
+    max(16px, env(safe-area-inset-bottom, 0px))
+    max(16px, env(safe-area-inset-left, 0px));
+  background: rgba(29, 27, 23, 0.65);
+}
+.modal[hidden] { display: none; }
+
+.modal__card {
+  width: min(880px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: 8px 8px 0 var(--sea);
+  overflow: hidden;
+  animation: modalIn 0.18s ease-out;
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.modal__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 14px 20px;
+  background: var(--ink);
+  color: var(--paper);
+  flex-shrink: 0;
+}
+.modal__headtext { flex: 1; min-width: 0; }
+.modal__headtext h2 { margin: 0; font-size: 19px; font-weight: 900; letter-spacing: 0.04em; }
+.modal__headtext p {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: #bdb4a2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.modal__close {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #5d574b;
+  background: #2b2822;
+  color: var(--paper);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.modal__close:active { filter: brightness(0.85); }
+.modal__close:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+
+.modal__list {
+  list-style: none;
+  margin: 0;
+  padding: 10px 22px 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+/* 拡大表示では文字と余白を大きくして読みやすく */
+.modal .note { padding: 16px 0 16px 30px; margin-left: 8px; }
+.modal .note::before { left: -9px; top: 23px; width: 14px; height: 14px; }
+.modal .note__card { padding: 16px 18px; }
+.modal .note__ver { font-size: 22px; }
+.modal .note__date { font-size: 13px; }
+.modal .note__badge { font-size: 11px; padding: 2px 8px; }
+.modal .note__play { font-size: 13.5px; padding: 7px 15px; }
+.modal .note__title { margin-top: 10px; font-size: 17px; line-height: 1.6; }
+.modal .note__group { margin-top: 12px; gap: 9px; }
+.modal .note__item { font-size: 15.5px; line-height: 1.75; gap: 10px; }
+.modal .note__item .tag { font-size: 12px; padding: 2px 9px; margin-top: 4px; }
+
+@media (max-width: 600px) {
+  .modal { padding: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
+  .modal__head { padding: 12px 12px 12px 16px; }
+  .modal__legend { display: none; }
+  .modal__list { padding: 6px 14px 24px; }
+  .modal .note { padding-left: 24px; }
+  .modal .note__card { padding: 13px 14px; }
+  .modal .note__item { font-size: 14.5px; }
+}
 
 /* ---------- drop overlay ---------- */
 .drop-overlay {

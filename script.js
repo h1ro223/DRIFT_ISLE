@@ -2217,6 +2217,73 @@
     setWorkshop(!buildEls.workshop.classList.contains('is-open'));
   });
 
+  // ---------- 更新履歴の拡大表示(ポップアップ) ----------
+  // 更新履歴パネルをタップ(または「大きく見る」)で、前面に大きく表示する
+  const modalEls = {
+    root: $('notesModal'),
+    list: $('notesModalList'),
+    sub: $('notesModalSub'),
+    close: $('notesModalClose'),
+    panel: document.querySelector('.notes'),
+  };
+
+  function isNotesModalOpen() {
+    return !modalEls.root.hidden;
+  }
+
+  function openNotesModal() {
+    if (isNotesModalOpen() || !buildEls.notes.children.length) return;
+    const project = projectById(buildState.tab) || BUILDS.projects[0];
+    modalEls.sub.textContent = project.title;
+    modalEls.list.innerHTML = '';
+    // 画面右の履歴をそのまま複製して表示(ボタンの動作は下の click 委譲で処理)
+    Array.from(buildEls.notes.children).forEach((li) => {
+      modalEls.list.appendChild(li.cloneNode(true));
+    });
+    modalEls.root.hidden = false;
+    document.body.classList.add('is-modal-open');
+    modalEls.list.scrollTop = 0;
+  }
+
+  function closeNotesModal() {
+    if (!isNotesModalOpen()) return;
+    modalEls.root.hidden = true;
+    modalEls.list.innerHTML = '';
+    document.body.classList.remove('is-modal-open');
+  }
+
+  // 「遊ぶ」「読み直す」ボタン以外のどこを押しても開く
+  modalEls.panel.addEventListener('click', (e) => {
+    if (e.target.closest('.note__play')) return;
+    openNotesModal();
+  });
+
+  modalEls.close.addEventListener('click', closeNotesModal);
+  // 枠の外(暗い部分)をタップしても閉じる
+  modalEls.root.addEventListener('click', (e) => {
+    if (e.target === modalEls.root) closeNotesModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeNotesModal();
+  });
+
+  // ポップアップ内の「▶ 遊ぶ」:閉じてからそのバージョンを起動
+  modalEls.list.addEventListener('click', (e) => {
+    const btn = e.target.closest('.note__play');
+    if (!btn || buildState.busyKey) return;
+    const project = projectById(buildState.tab);
+    if (!project) return;
+    const li = btn.closest('.note');
+    closeNotesModal();
+    if (project.type !== 'versions') {
+      loadBuild(project, null);
+      return;
+    }
+    const ver = li && li.dataset.version;
+    const v = (buildState.versions[project.id] || []).find((x) => x.version === ver);
+    if (v) loadBuild(project, v);
+  });
+
   // 起動時:一覧を取得して、初回(何も復元されなかった時)は最新版を自動で起動
   async function initBuilds(restored) {
     setWorkshop(readJSON(BUILDS.workshopKey) === true);
