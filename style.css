@@ -984,7 +984,7 @@ body.is-modal-open { overflow: hidden; }
   flex-shrink: 0;
 }
 .modal__headtext { flex: 1; min-width: 0; }
-.modal__headtext h2 { margin: 0; font-size: 19px; font-weight: 900; letter-spacing: 0.04em; }
+.modal__headtext h2 { margin: 0; font-size: 18px; font-weight: 900; letter-spacing: 0.04em; }
 .modal__headtext p {
   margin: 3px 0 0;
   font-size: 12.5px;
@@ -1017,17 +1017,17 @@ body.is-modal-open { overflow: hidden; }
   -webkit-overflow-scrolling: touch;
 }
 /* 拡大表示では文字と余白を大きくして読みやすく */
-.modal .note { padding: 16px 0 16px 30px; margin-left: 8px; }
-.modal .note::before { left: -9px; top: 23px; width: 14px; height: 14px; }
-.modal .note__card { padding: 16px 18px; }
-.modal .note__ver { font-size: 22px; }
-.modal .note__date { font-size: 13px; }
-.modal .note__badge { font-size: 11px; padding: 2px 8px; }
-.modal .note__play { font-size: 13.5px; padding: 7px 15px; }
-.modal .note__title { margin-top: 10px; font-size: 17px; line-height: 1.6; }
-.modal .note__group { margin-top: 12px; gap: 9px; }
-.modal .note__item { font-size: 15.5px; line-height: 1.75; gap: 10px; }
-.modal .note__item .tag { font-size: 12px; padding: 2px 9px; margin-top: 4px; }
+.modal .note { padding: 13px 0 13px 28px; margin-left: 8px; }
+.modal .note::before { left: -8px; top: 19px; width: 13px; height: 13px; }
+.modal .note__card { padding: 13px 16px; }
+.modal .note__ver { font-size: 18px; }
+.modal .note__date { font-size: 12px; }
+.modal .note__badge { font-size: 10.5px; padding: 2px 7px; }
+.modal .note__play { font-size: 12.5px; padding: 5px 12px; }
+.modal .note__title { margin-top: 8px; font-size: 15px; line-height: 1.6; }
+.modal .note__group { margin-top: 10px; gap: 7px; }
+.modal .note__item { font-size: 13.5px; line-height: 1.7; gap: 9px; }
+.modal .note__item .tag { font-size: 11px; padding: 2px 8px; margin-top: 2px; }
 
 @media (max-width: 600px) {
   .modal { padding: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
@@ -1035,8 +1035,9 @@ body.is-modal-open { overflow: hidden; }
   .modal__legend { display: none; }
   .modal__list { padding: 6px 14px 24px; }
   .modal .note { padding-left: 24px; }
-  .modal .note__card { padding: 13px 14px; }
-  .modal .note__item { font-size: 14.5px; }
+  .modal .note__card { padding: 12px 13px; }
+  .modal .note__title { font-size: 14px; }
+  .modal .note__item { font-size: 13px; }
 }
 
 /* ---------- drop overlay ---------- */
