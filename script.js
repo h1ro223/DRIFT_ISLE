@@ -1766,6 +1766,8 @@
     projects: [
       { id: 'new', badge: 'NEW', title: '無人島サバイバル債務録', type: 'versions', manifest: 'versions.json' },
       { id: 'old', badge: 'OLD', title: 'DRIFT ISLE ～無人島脱出記～', type: 'folder', note: '開発を終了した旧作です。比較用にそのまま残しています。' },
+      // ★ title(タブに出る名前)と note(説明文)は好きな文に書き換えてOK
+      { id: 'hyper', badge: 'HYPER', title: 'HYPER', type: 'folder', note: 'test/hyper/ のフォルダをそのまま起動します。' },
     ],
     maxProbe: 200, // zip自動検出の上限
     currentKey: 'pd_current_build', // 最後に起動したビルド
