@@ -1767,7 +1767,8 @@
       { id: 'new', badge: 'NEW', title: '無人島サバイバル債務録', type: 'versions', manifest: 'versions.json' },
       { id: 'old', badge: 'OLD', title: 'DRIFT ISLE ～無人島脱出記～', type: 'folder', note: '開発を終了した旧作です。比較用にそのまま残しています。' },
       // ★ title(タブに出る名前)と note(説明文)は好きな文に書き換えてOK
-      { id: 'hyper', badge: 'HYPER', title: 'HYPER', type: 'folder', note: 'test/hyper/ のフォルダをそのまま起動します。' },
+      // zips : test/hyper/ に置いたzipのファイル名(増やす時は配列に足す。名前に空白があってもOK)
+      { id: 'hyper', badge: 'HYPER', title: 'HYPER', type: 'versions', zips: ['new version.zip'] },
     ],
     maxProbe: 200, // zip自動検出の上限
     currentKey: 'pd_current_build', // 最後に起動したビルド
@@ -1869,6 +1870,7 @@
     let manifestOk = false;
     let manifestMissing = false; // jsonがまだ無い(404) = 警告ではなく案内だけ
     try {
+      if (!project.manifest) throw new Error('no manifest'); // zips方式はjson不要
       const res = await fetch(base + project.manifest, { cache: 'no-cache' });
       if (res.status === 404) manifestMissing = true;
       if (res.ok) {
@@ -1884,11 +1886,24 @@
     const map = new Map();
     list.forEach((v) => map.set(v.version, v));
 
+    // zips方式:指定されたzipをそのまま一覧に入れる(連番の自動検出はしない)
+    const fixedZips = Array.isArray(project.zips) ? project.zips : null;
+    if (fixedZips) {
+      fixedZips.forEach((file) => {
+        const ver = String(file).replace(/\.zip$/i, '');
+        if (!map.has(ver)) {
+          const nv = normalizeVersion({ version: ver, file });
+          nv.listed = true; // 「未記入」ではなく「記載なし」と表示
+          map.set(ver, nv);
+        }
+      });
+    }
+
     // jsonに無い v〇.zip を連番で探す(最大番号の次から、見つからなくなるまで)
     let n = 0;
     map.forEach((v) => { const p = versionParts(v.version); if (p.length === 1) n = Math.max(n, p[0]); });
     let probed = 0;
-    for (let i = n + 1; i <= BUILDS.maxProbe; i += 1) {
+    for (let i = n + 1; !fixedZips && i <= BUILDS.maxProbe; i += 1) {
       const name = `v${i}`;
       if (map.has(name)) continue;
       if (!(await zipExists(base + `${name}.zip`))) break;
@@ -1897,12 +1912,17 @@
       probed += 1;
     }
 
-    const versions = Array.from(map.values()).sort((a, b) => compareVersion(a.version, b.version));
+    // zips方式は指定した順のまま(画面は新しい順=逆順で描くので、ここで逆にして指定順に見せる)
+    const versions = fixedZips
+      ? Array.from(map.values()).reverse()
+      : Array.from(map.values()).sort((a, b) => compareVersion(a.version, b.version));
     let text;
     let warn = false;
     if (!versions.length) {
       text = `test/${project.id}/ に v1.zip などが見つかりません`;
       warn = true;
+    } else if (fixedZips) {
+      text = `${versions.length}個のzip / タップで起動`;
     } else {
       text = `${versions.length}バージョン / 最新 ${versions[versions.length - 1].version}`;
       if (!manifestOk && manifestMissing) {
@@ -1980,12 +2000,15 @@
     if (!versions.length) {
       const p = document.createElement('p');
       p.className = 'builds__empty';
-      p.textContent = 'test/new/ に v1.zip を置くとここに表示されます。';
+      p.textContent = project.zips
+        ? `test/${project.id}/ に ${project.zips.join(' / ')} を置くとここに表示されます。`
+        : `test/${project.id}/ に v1.zip を置くとここに表示されます。`;
       buildEls.list.appendChild(p);
       return;
     }
 
     const latest = versions[versions.length - 1].version;
+    const showLatest = !project.zips; // zip固定方式は新旧の概念がないのでLATESTを出さない
     const selected = buildState.selected[project.id]
       || (playing && playing.project === project.id ? playing.version : latest);
 
@@ -2009,9 +2032,10 @@
       num.textContent = v.version;
       const date = document.createElement('span');
       date.className = 'ver__date';
-      date.textContent = v.date || v.file;
+      date.textContent = v.date || (project.zips ? 'zip' : v.file);
+      if (v.version.length > 5) btn.classList.add('ver--long'); // 長い名前は小さめの字で収める
       btn.append(num, date);
-      if (v.version === latest) {
+      if (showLatest && v.version === latest) {
         const flag = document.createElement('span');
         flag.className = 'ver__flag';
         flag.textContent = 'LATEST';
@@ -2023,7 +2047,7 @@
       // 更新履歴
       const li = document.createElement('li');
       li.className = 'note';
-      if (v.version === latest) li.classList.add('is-latest');
+      if (showLatest && v.version === latest) li.classList.add('is-latest');
       if (isCurrent) li.classList.add('is-current');
       if (v.version === selected) li.classList.add('is-selected');
       li.dataset.version = v.version;
@@ -2042,7 +2066,7 @@
         d.textContent = v.date;
         head.appendChild(d);
       }
-      if (v.version === latest) {
+      if (showLatest && v.version === latest) {
         const b = document.createElement('span');
         b.className = 'note__badge note__badge--latest';
         b.textContent = 'LATEST';

@@ -267,7 +267,9 @@ button { color: inherit; }
 
 .ver:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
 .ver__num { font-family: var(--mono); font-size: 18px; font-weight: 700; line-height: 1.1; }
-.ver__date { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
+.ver__date { font-family: var(--mono); font-size: 10px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 「new version」のような長い名前は、字を小さくして折り返す */
+.ver--long .ver__num { font-size: 13px; line-height: 1.25; overflow-wrap: anywhere; }
 .ver__flag {
   position: absolute;
   top: -9px;
