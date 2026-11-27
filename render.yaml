@@ -1,0 +1,18 @@
+# 売倍アイランド マルチプレイ用サーバー（Render の Blueprint）
+#   リポジトリのいちばん上（ルート）に置く。サーバーの中身は server フォルダ
+#   rootDir があるので、ゲームのファイル（html/css/js）を更新しても、サーバーは作り直されない
+services:
+  - type: web
+    name: baibai-island-server
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: server
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: ALLOW_ORIGINS
+        value: https://h1ro223.github.io
+      - key: NODE_VERSION
+        value: "22"
